@@ -3,7 +3,32 @@ import { Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StoreChip } from "@/components/security/store-glyph";
 import { STORE_ORDER } from "@/lib/catalog";
+import type { StoreId } from "@/lib/types";
 import { HeroTerminal } from "./hero-terminal";
+
+/** Distinct store hues. These are not severity colors. */
+const STORE_TONE: Record<StoreId, { chip: string; glyph: string }> = {
+  chroma: {
+    chip: "border-[#FF6A00]/35 bg-[#FF6A00]/10",
+    glyph: "border-transparent bg-[#FF6A00] text-white",
+  },
+  qdrant: {
+    chip: "border-[#E11D48]/35 bg-[#E11D48]/10",
+    glyph: "border-transparent bg-[#E11D48] text-white",
+  },
+  pgvector: {
+    chip: "border-[#336791]/35 bg-[#336791]/10",
+    glyph: "border-transparent bg-[#336791] text-white",
+  },
+  pinecone: {
+    chip: "border-[#0F766E]/35 bg-[#0F766E]/10",
+    glyph: "border-transparent bg-[#0F766E] text-white",
+  },
+  jsonl: {
+    chip: "border-[#6D28D9]/35 bg-[#6D28D9]/10",
+    glyph: "border-transparent bg-[#6D28D9] text-white",
+  },
+};
 
 export function Hero() {
   return (
@@ -37,20 +62,25 @@ export function Hero() {
               </Button>
             </div>
             <p className="mt-5 font-mono text-xs text-muted-foreground">Local-first · Read-only · Open source</p>
+          </div>
 
-            <div className="mt-10 border-t pt-6 lg:mt-auto">
+          <div className="flex flex-col gap-5">
+            <HeroTerminal />
+            <div>
               <p className="text-[13px] text-muted-foreground">Connects read-only to</p>
-              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Supported memory stores">
+              <ul className="mt-3 flex flex-wrap gap-2.5" aria-label="Supported memory stores">
                 {STORE_ORDER.map((id) => (
                   <li key={id}>
-                    <StoreChip store={id} />
+                    <StoreChip
+                      store={id}
+                      className={`h-9 pr-3 text-sm ${STORE_TONE[id].chip}`}
+                      glyphClassName={`size-6 rounded-[5px] text-[10px] ${STORE_TONE[id].glyph}`}
+                    />
                   </li>
                 ))}
               </ul>
             </div>
           </div>
-
-          <HeroTerminal />
         </div>
       </div>
     </section>

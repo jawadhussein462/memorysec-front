@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens are HSL triplets so Tailwind can apply alpha (bg-sev-critical/10).
+ * Dark is the default (the dashboard). The landing page opts into .theme-light,
+ * and any subtree can switch back with .theme-dark (terminals, privacy section).
+ */
+@layer base {
+  :root,
+  .theme-dark {
+    --background: 206 24% 6%;
+    --foreground: 200 14% 93%;
+    --card: 205 21% 8.5%;
+    --card-foreground: 200 14% 93%;
+    --popover: 205 20% 10%;
+    --popover-foreground: 200 14% 93%;
+    --primary: 200 14% 93%;
+    --primary-foreground: 206 24% 7%;
+    --secondary: 205 16% 13%;
+    --secondary-foreground: 200 14% 92%;
+    --muted: 205 16% 11.5%;
+    --muted-foreground: 205 8% 61%;
+    --accent: 205 16% 14%;
+    --accent-foreground: 200 14% 95%;
+    --border: 205 15% 15.5%;
+    --input: 205 13% 20%;
+    --ring: 205 10% 56%;
+
+    --sev-critical: 0 84% 65%;
+    --sev-high: 20 92% 60%;
+    --sev-medium: 39 90% 56%;
+    --sev-low: 212 14% 63%;
+    --safe: 155 56% 50%;
+    --info: 212 92% 69%;
+
+    color-scheme: dark;
+  }
+
+  :root {
+    --radius: 0.625rem;
+    --terminal: 206 26% 6.5%;
+    --terminal-foreground: 200 18% 87%;
+    --terminal-muted: 205 9% 52%;
+  }
+
+  .theme-light {
+    --background: 90 8% 95.5%;
+    --foreground: 206 22% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 206 22% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 206 22% 8%;
+    --primary: 206 24% 9%;
+    --primary-foreground: 90 10% 97%;
+    --secondary: 90 6% 91%;
+    --secondary-foreground: 206 22% 10%;
+    --muted: 90 7% 92%;
+    --muted-foreground: 206 6% 37%;
+    --accent: 90 6% 90%;
+    --accent-foreground: 206 22% 8%;
+    --border: 90 5% 85%;
+    --input: 90 4% 79%;
+    --ring: 206 10% 38%;
+
+    --sev-critical: 0 74% 41%;
+    --sev-high: 17 86% 43%;
+    --sev-medium: 35 92% 32%;
+    --sev-low: 214 14% 43%;
+    --safe: 158 76% 27%;
+    --info: 213 78% 43%;
+
+    color-scheme: light;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    font-feature-settings: "kern", "liga", "calt";
+  }
+
+  body:has(.theme-light-page) {
+    background-color: hsl(90 8% 95.5%);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: hsl(var(--foreground) / 0.16);
+  }
+}
+
+@layer utilities {
+  /* Archivo's width axis, pushed semi-expanded for display type. */
+  .type-display {
+    font-variation-settings: "wdth" 114;
+    letter-spacing: -0.032em;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--foreground) / 0.055) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.055) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .bg-dots {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.09) 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

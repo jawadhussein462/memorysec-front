@@ -28,18 +28,10 @@ export function StoreGlyph({
   );
 }
 
-export function StoreChip({
-  store,
-  className,
-  glyphClassName,
-}: {
-  store: StoreId;
-  className?: string;
-  glyphClassName?: string;
-}) {
+export function StoreChip({ store, className }: { store: StoreId; className?: string }) {
   return (
     <span className={cn("inline-flex h-8 items-center gap-2 rounded-md border bg-card pl-1.5 pr-2.5 text-[13px]", className)}>
-      <StoreGlyph store={store} size="sm" className={glyphClassName} />
+      <StoreGlyph store={store} size="sm" />
       {store === "pgvector" ? "pgvector" : stores[store].name}
     </span>
   );

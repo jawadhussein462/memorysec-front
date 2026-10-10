@@ -14,7 +14,7 @@ export const site = {
    * Where demo requests are sent. The form opens the visitor's mail app addressed here.
    * Set `demoBookingUrl` to a Cal.com / Calendly link to show a scheduling button instead of the form.
    */
-  contactEmail: "hello@mimvo.dev",
+  contactEmail: "jawadhussein462@gmail.com",
   demoBookingUrl: "" as string,
   /**
    * Mimvo is not published on PyPI: it installs from the GitHub repository with uv.

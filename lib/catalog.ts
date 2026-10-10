@@ -1,26 +1,26 @@
 import {
   ArchiveX,
-  ChevronsUp,
   Eye,
-  Files,
   FlaskConical,
-  GitCompare,
   KeyRound,
+  Puzzle,
   Syringe,
   Trash2,
-  Waves,
   type LucideIcon,
 } from "lucide-react";
-import type { CategoryId, RemediationAction, RiskLevel, Severity, StoreId } from "./types";
+import { RULES } from "./rules.generated";
+import type { Action, CheckId, RiskLevel, RuleMeta, Severity, StoreId } from "./types";
 
 /* ------------------------------------------------------------------ */
 /* Severity                                                            */
 /* ------------------------------------------------------------------ */
 
-export const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low"];
+/** Most serious first, the order every mimvo report uses. */
+export const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
 
 export interface SeverityMeta {
   label: string;
+  /** `Severity.rank` in the package: 0 for info through 4 for critical. */
   rank: number;
   text: string;
   soft: string;
@@ -66,6 +66,15 @@ export const severities: Record<Severity, SeverityMeta> = {
     bar: "bg-sev-low",
     fill: "hsl(var(--sev-low))",
   },
+  info: {
+    label: "Info",
+    rank: 0,
+    text: "text-info",
+    soft: "bg-info/10",
+    border: "border-info/30",
+    bar: "bg-info",
+    fill: "hsl(var(--info))",
+  },
 };
 
 export const riskTone: Record<RiskLevel, { text: string; soft: string; border: string; severity?: Severity }> = {
@@ -73,134 +82,167 @@ export const riskTone: Record<RiskLevel, { text: string; soft: string; border: s
   High: { text: "text-sev-high", soft: "bg-sev-high/10", border: "border-sev-high/30", severity: "high" },
   Medium: { text: "text-sev-medium", soft: "bg-sev-medium/10", border: "border-sev-medium/30", severity: "medium" },
   Low: { text: "text-sev-low", soft: "bg-sev-low/10", border: "border-sev-low/30", severity: "low" },
+  Info: { text: "text-info", soft: "bg-info/10", border: "border-info/30", severity: "info" },
   Clean: { text: "text-safe", soft: "bg-safe/10", border: "border-safe/30" },
 };
 
 /* ------------------------------------------------------------------ */
-/* Scan categories                                                     */
+/* Checks and rules                                                    */
 /* ------------------------------------------------------------------ */
 
-export const OWASP = {
-  memory: "ASI06 · Memory & Context Poisoning",
-  privilege: "ASI03 · Identity & Privilege Abuse",
-  disclosure: "LLM02:2025 · Sensitive Information Disclosure",
-};
+export const CHECK_ORDER: CheckId[] = ["secrets", "injection", "poisoning"];
 
-export const CATEGORY_ORDER: CategoryId[] = [
-  "poisoning",
-  "injection",
-  "pii",
-  "contradiction",
-  "amplification",
-  "flooding",
-  "escalation",
-];
+export interface DetectorMeta {
+  /** `BaseDetector.name`, as written in reports. */
+  name: string;
+  /** Class to import in Python. */
+  className: string;
+  method: string;
+  /** What it needs beyond the core install. Empty for the offline defaults. */
+  needs?: string;
+  /** Runs in `Mimvo()` with no configuration. */
+  default?: boolean;
+}
 
-export interface CategoryMeta {
-  id: CategoryId;
-  /** Chart and filter label. */
+export interface CheckMeta {
+  id: CheckId;
   label: string;
-  /** Finding title used in tables and the detail drawer. */
-  finding: string;
-  /** Scanner toggle label. */
-  scanner: string;
-  /** Landing page card title. */
-  landing: string;
-  /** CLI scanner key. */
-  key: string;
+  /** Python class, such as `SecretsCheck`. */
+  className: string;
   icon: LucideIcon;
   description: string;
   owasp: string;
+  detectors: DetectorMeta[];
 }
 
-export const categories: Record<CategoryId, CategoryMeta> = {
-  poisoning: {
-    id: "poisoning",
-    label: "Memory poisoning",
-    finding: "Memory poisoning",
-    scanner: "Memory poisoning",
-    landing: "Poisoned facts",
-    key: "poisoning",
-    icon: FlaskConical,
-    description: "Attacker-controlled or false facts inserted into long-term agent memory.",
-    owasp: OWASP.memory,
+export const checks: Record<CheckId, CheckMeta> = {
+  secrets: {
+    id: "secrets",
+    label: "Secrets and PII",
+    className: "SecretsCheck",
+    icon: KeyRound,
+    description: "API keys, tokens, passwords, private keys and connection strings. Personal data is opt-in.",
+    owasp: "LLM02: Sensitive Information Disclosure",
+    detectors: [
+      { name: "heuristic", className: "HeuristicSecretsDetector", method: "Provider key formats, JWTs, private keys, key=value", default: true },
+      { name: "gitleaks", className: "GitleaksDetector", method: "Port of ~20 high-value Gitleaks rules", default: true },
+      { name: "entropy", className: "EntropyDetector", method: "High-entropy hex and base64 runs" },
+      { name: "presidio", className: "PresidioDetector", method: "Microsoft Presidio analyzer", needs: "[presidio]" },
+      { name: "gliner2_pii", className: "GLiNER2PIIDetector", method: "GLiNER2 privacy filter", needs: "[gliner2]" },
+    ],
   },
   injection: {
     id: "injection",
-    label: "Persistent injection",
-    finding: "Persistent prompt injection",
-    scanner: "Persistent prompt injection",
-    landing: "Persistent prompt injection",
-    key: "injection",
+    label: "Hidden instructions",
+    className: "InjectionCheck",
     icon: Syringe,
-    description: "Hidden instructions stored in memory that try to steer future model behavior.",
-    owasp: OWASP.memory,
+    description: "Text aimed at the agent: overrides, fake system messages, task hijacks, persona switches.",
+    owasp: "LLM01: Prompt Injection",
+    detectors: [
+      { name: "heuristic", className: "HeuristicInjectionDetector", method: "Scored phrase rules after deobfuscation", default: true },
+      { name: "prompt_guard", className: "PromptGuardDetector", method: "Llama Prompt Guard 2", needs: "[hf]" },
+      { name: "protectai_deberta", className: "ProtectAIDeBERTaDetector", method: "ProtectAI DeBERTa v3 classifier", needs: "[hf]" },
+      { name: "lakera_guard", className: "LakeraGuardDetector", method: "Lakera Guard API (sends text)", needs: "LAKERA_GUARD_API_KEY" },
+    ],
   },
-  pii: {
-    id: "pii",
-    label: "PII / privacy leakage",
-    finding: "PII leakage",
-    scanner: "PII / privacy leakage",
-    landing: "PII / privacy leakage",
-    key: "pii",
-    icon: KeyRound,
-    description: "Secrets, tokens, credentials, or personal data stored where they should not be.",
-    owasp: OWASP.disclosure,
-  },
-  contradiction: {
-    id: "contradiction",
-    label: "Contradictory memory",
-    finding: "Contradictory memory",
-    scanner: "Contradictory memory",
-    landing: "Contradictory memory",
-    key: "contradiction",
-    icon: GitCompare,
-    description: "Stored facts or instructions that conflict with trusted existing memories.",
-    owasp: OWASP.memory,
-  },
-  amplification: {
-    id: "amplification",
-    label: "Duplicate / amplification",
-    finding: "Amplification attack",
-    scanner: "Duplicate / amplification",
-    landing: "Duplicate / amplification",
-    key: "amplification",
-    icon: Files,
-    description: "Near-duplicate malicious memories repeated to win retrieval and gain influence.",
-    owasp: OWASP.memory,
-  },
-  flooding: {
-    id: "flooding",
-    label: "Memory flooding",
-    finding: "Memory flooding",
-    scanner: "Memory flooding",
-    landing: "Memory flooding",
-    key: "flooding",
-    icon: Waves,
-    description: "Abnormal write volume or repetitive content that crowds useful context out of memory.",
-    owasp: OWASP.memory,
-  },
-  escalation: {
-    id: "escalation",
-    label: "Authority / scope escalation",
-    finding: "Authority escalation",
-    scanner: "Authority / scope escalation",
-    landing: "Authority / scope escalation",
-    key: "escalation",
-    icon: ChevronsUp,
-    description: "Memories that grant themselves authority, change policy, or cross user and tenant boundaries.",
-    owasp: OWASP.privilege,
+  poisoning: {
+    id: "poisoning",
+    label: "Poisoned facts",
+    className: "PoisoningCheck",
+    icon: FlaskConical,
+    description: "Claims that switch off a control or redirect payments and data, plus planted near-duplicates.",
+    owasp: "ASI06: Memory & Context Poisoning",
+    detectors: [
+      { name: "heuristic", className: "HeuristicPoisoningDetector", method: "Control-bypass, limit-removal and redirect rules", default: true },
+      { name: "trustrag", className: "TrustRAGDetector", method: "Tight clusters of near-paraphrases", default: true },
+      { name: "hubness", className: "HubnessDetector", method: "k-occurrence outliers in stored vectors", default: true },
+      { name: "temporal_nli", className: "TemporalNLIDetector", method: "NLI contradiction against older neighbours", needs: "nli= callback" },
+      { name: "perplexity", className: "PerplexityDetector", method: "Whole-text perplexity under a causal LM", needs: "[hf]" },
+      { name: "embedding_consistency", className: "EmbeddingConsistencyDetector", method: "Re-embed the text and compare", needs: "embed= callback" },
+    ],
   },
 };
+
+/** Detectors `Mimvo()` runs with no configuration, as `ScanReport.checks` lists them. */
+export const DEFAULT_CHECKS: Record<CheckId, string[]> = Object.fromEntries(
+  CHECK_ORDER.map((c) => [c, checks[c].detectors.filter((d) => d.default).map((d) => d.name)]),
+) as Record<CheckId, string[]>;
+
+export function checkMeta(id: string): CheckMeta | null {
+  return (checks as Record<string, CheckMeta>)[id] ?? null;
+}
+
+export function checkIcon(id: string): LucideIcon {
+  return checkMeta(id)?.icon ?? Puzzle;
+}
+
+export function checkLabel(id: string): string {
+  return checkMeta(id)?.label ?? id;
+}
+
+/** Rule ids in report order: by check, then most severe first. */
+export const RULE_ORDER: string[] = CHECK_ORDER.flatMap((c) =>
+  Object.values(RULES as Record<string, RuleMeta>)
+    .filter((r) => r.check === c)
+    .sort((a, b) => severities[b.severity].rank - severities[a.severity].rank)
+    .map((r) => r.id),
+);
+
+/** `rule_for(code)`: the catalogue entry, or the generic rule mimvo uses for custom checks. */
+export function ruleFor(code: string): RuleMeta {
+  const known = (RULES as Record<string, RuleMeta>)[code];
+  if (known) return known;
+  const title = code.replace(/[_-]/g, " ");
+  return {
+    id: code,
+    title: title.charAt(0).toUpperCase() + title.slice(1),
+    check: "custom",
+    severity: "medium",
+    action: "review",
+    summary: "Raised by a custom check.",
+    message: "Raised by a custom check.",
+    remediation: ["Review the record against the custom check's documentation."],
+    owaspId: "ASI06",
+    owasp: "ASI06: Memory & Context Poisoning",
+    owaspUrl: "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+    cwe: [],
+  };
+}
+
+export function owaspId(owasp: string) {
+  return owasp.split(":")[0].trim();
+}
+
+export function cweUrl(cwe: string) {
+  return `https://cwe.mitre.org/data/definitions/${cwe.split("-")[1]}.html`;
+}
 
 /* ------------------------------------------------------------------ */
 /* Recommended actions                                                 */
 /* ------------------------------------------------------------------ */
 
-export const actions: Record<RemediationAction, { icon: LucideIcon; meaning: string }> = {
-  Delete: { icon: Trash2, meaning: "Remove the record from the memory store." },
-  Quarantine: { icon: ArchiveX, meaning: "Keep the record, but exclude it from retrieval until verified." },
-  Review: { icon: Eye, meaning: "Have an owner confirm whether the record should stay." },
+/** Strongest first, as in `ScanReport.action_plan()`. */
+export const ACTION_ORDER: Action[] = ["delete", "quarantine", "review"];
+
+export const actions: Record<Action, { label: string; icon: LucideIcon; meaning: string; precedence: number }> = {
+  delete: {
+    label: "Delete",
+    icon: Trash2,
+    meaning: "Remove these records. Rotate any credential they hold before you delete.",
+    precedence: 2,
+  },
+  quarantine: {
+    label: "Quarantine",
+    icon: ArchiveX,
+    meaning: "Keep these out of retrieval until someone confirms they are true.",
+    precedence: 1,
+  },
+  review: {
+    label: "Review",
+    icon: Eye,
+    meaning: "A person should read these and decide. Most are fine to keep once checked.",
+    precedence: 0,
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -219,12 +261,15 @@ export interface StoreField {
 export interface StoreMeta {
   id: StoreId;
   name: string;
+  /** `mimvo scan <slug>`. */
   slug: string;
   monogram: string;
   kind: string;
   noun: string;
   description: string;
   access: string;
+  /** pip extra that installs the client, if any. */
+  extra?: string;
   fields: StoreField[];
   demo: Record<string, string>;
   resourceKey: string;
@@ -234,7 +279,13 @@ export interface StoreMeta {
   command: (values: Record<string, string>) => string;
 }
 
-export const STORE_ORDER: StoreId[] = ["chroma", "qdrant", "pgvector", "pinecone", "jsonl"];
+export const STORE_ORDER: StoreId[] = ["chroma", "qdrant", "pgvector", "pinecone", "langchain", "mem0", "jsonl"];
+
+const pyReport = (source: string, label: string) => `report = Mimvo().scan(${source})
+report.source = "${label}"
+Path("report.html").write_text(render_html(report), encoding="utf-8")`;
+
+const q = (v: string) => (/^[\w./:@-]+$/.test(v) ? v : `'${v.replace(/'/g, "'\\''")}'`);
 
 export const stores: Record<StoreId, StoreMeta> = {
   chroma: {
@@ -242,67 +293,70 @@ export const stores: Record<StoreId, StoreMeta> = {
     name: "Chroma",
     slug: "chroma",
     monogram: "Ch",
-    kind: "Local or HTTP",
+    kind: "Persist directory",
     noun: "collection",
-    description: "Scan a local persist directory or a Chroma server.",
+    description: "Scan a collection in a local Chroma database. Stored vectors are read too.",
     access: "Reads records with get(). Never calls add, update, upsert, or delete.",
+    extra: "chroma",
     fields: [
-      { key: "path", label: "Persist directory or URL", placeholder: "./chroma_db", required: true },
+      { key: "path", label: "Database directory", placeholder: "./chroma_db", required: true },
       { key: "collection", label: "Collection", placeholder: "agent_memory", required: true },
     ],
     demo: { path: "./chroma_db", collection: "agent_memory" },
     resourceKey: "collection",
     endpointKey: "path",
     flags: [
-      { flag: "--path", description: "Persist directory, or an http:// URL for a Chroma server." },
-      { flag: "--collection", description: "Collection to scan." },
-      { flag: "--report", description: "Write an HTML report to this path." },
+      { flag: "--path", description: "Path to the Chroma database directory." },
+      { flag: "--collection", description: "Collection name." },
     ],
-    python: `from memorysec import Scanner
-from memorysec.sources import ChromaSource
+    python: `from pathlib import Path
 
-source = ChromaSource(path="./chroma_db", collection="agent_memory")
-report = Scanner().scan(source)
-report.write_html("report.html")`,
-    command: (v) => `memorysec scan chroma \\\n  --path ${v.path || "./chroma_db"} \\\n  --collection ${v.collection || "agent_memory"}`,
+from mimvo import Mimvo
+from mimvo.scan import ChromaScanSource, render_html
+
+source = ChromaScanSource(path="./chroma_db", collection="agent_memory")
+${pyReport("source", "chroma:agent_memory")}`,
+    command: (v) => `mimvo scan chroma \\\n  --path ${q(v.path || "./chroma_db")} \\\n  --collection ${q(v.collection || "agent_memory")}`,
   },
   qdrant: {
     id: "qdrant",
     name: "Qdrant",
     slug: "qdrant",
     monogram: "Qd",
-    kind: "HTTP / gRPC",
+    kind: "HTTP",
     noun: "collection",
-    description: "Scan points and payloads in a Qdrant collection.",
-    access: "Reads points and payloads with scroll. Never upserts or deletes points.",
+    description: "Scan points, payloads and vectors in a Qdrant collection.",
+    access: "Reads points with scroll. Never upserts or deletes points.",
+    extra: "qdrant",
     fields: [
       { key: "url", label: "Server URL", placeholder: "http://localhost:6333", required: true },
       { key: "collection", label: "Collection", placeholder: "agent_memory", required: true },
       {
-        key: "apiKey",
-        label: "API key",
-        placeholder: "Optional for local instances",
-        secret: true,
-        hint: "Use a read-only key for Qdrant Cloud. Keys stay in this browser tab.",
+        key: "textField",
+        label: "Text field",
+        placeholder: "content",
+        hint: "Payload key holding the text. By default mimvo tries content, text, page_content, document and memory.",
       },
     ],
-    demo: { url: "http://localhost:6333", collection: "agent_memory", apiKey: "" },
+    demo: { url: "http://localhost:6333", collection: "agent_memory", textField: "" },
     resourceKey: "collection",
     endpointKey: "url",
     flags: [
-      { flag: "--url", description: "Qdrant server URL." },
-      { flag: "--collection", description: "Collection to scan." },
-      { flag: "--api-key", description: "Read-only API key. Also read from QDRANT_API_KEY." },
-      { flag: "--report", description: "Write an HTML report to this path." },
+      { flag: "--url", description: "Qdrant HTTP URL." },
+      { flag: "--collection", description: "Collection name." },
+      { flag: "--api-key", description: "API key. Defaults to QDRANT_API_KEY; use a read-only key." },
+      { flag: "--text-field", description: "Payload field that holds the text." },
     ],
-    python: `from memorysec import Scanner
-from memorysec.sources import QdrantSource
+    python: `from pathlib import Path
 
-source = QdrantSource(url="http://localhost:6333", collection="agent_memory")
-report = Scanner().scan(source)
-report.write_html("report.html")`,
+from mimvo import Mimvo
+from mimvo.scan import QdrantScanSource, render_html
+
+source = QdrantScanSource(url="http://localhost:6333", collection="agent_memory")
+${pyReport("source.records(sample=10_000)", "qdrant:agent_memory")}`,
     command: (v) =>
-      `memorysec scan qdrant \\\n  --url ${v.url || "http://localhost:6333"} \\\n  --collection ${v.collection || "agent_memory"}`,
+      `mimvo scan qdrant \\\n  --url ${q(v.url || "http://localhost:6333")} \\\n  --collection ${q(v.collection || "agent_memory")}` +
+      (v.textField ? ` \\\n  --text-field ${q(v.textField)}` : ""),
   },
   pgvector: {
     id: "pgvector",
@@ -311,34 +365,41 @@ report.write_html("report.html")`,
     monogram: "pg",
     kind: "Postgres DSN",
     noun: "table",
-    description: "Scan a memory table in Postgres with the pgvector extension.",
+    description: "Scan a memory table in Postgres. Name the vector column to run the vector detectors.",
     access: "Runs SELECT queries only. Connect with a role limited to SELECT.",
+    extra: "pgvector",
     fields: [
       { key: "dsn", label: "Connection string", placeholder: "postgresql://localhost/app", required: true },
       { key: "table", label: "Table", placeholder: "memories", required: true },
       { key: "textColumn", label: "Text column", placeholder: "content", required: true },
+      { key: "embeddingColumn", label: "Embedding column", placeholder: "embedding", hint: "Lets TrustRAG and hubness run." },
     ],
-    demo: { dsn: "postgresql://localhost/app", table: "memories", textColumn: "content" },
+    demo: { dsn: "postgresql://localhost/app", table: "memories", textColumn: "content", embeddingColumn: "embedding" },
     resourceKey: "table",
     endpointKey: "dsn",
     flags: [
       { flag: "--dsn", description: "Postgres connection string. Use a SELECT-only role." },
-      { flag: "--table", description: "Table that stores agent memories." },
-      { flag: "--text-column", description: "Column holding the memory text." },
-      { flag: "--report", description: "Write an HTML report to this path." },
+      { flag: "--table", description: "Table name (schema.table allowed)." },
+      { flag: "--text-column", description: "Column that holds the memory text." },
+      { flag: "--id-column", description: "Column that holds the record id. Default id." },
+      { flag: "--embedding-column", description: "pgvector column, so the vector detectors can run." },
+      { flag: "--created-at-column", description: "Timestamp column, for TemporalNLIDetector ordering." },
     ],
-    python: `from memorysec import Scanner
-from memorysec.sources import PgvectorSource
+    python: `from pathlib import Path
 
-source = PgvectorSource(
+from mimvo import Mimvo
+from mimvo.scan import PgVectorScanSource, render_html
+
+source = PgVectorScanSource(
     dsn="postgresql://localhost/app",
     table="memories",
     text_column="content",
+    embedding_column="embedding",
 )
-report = Scanner().scan(source)
-report.write_html("security-report.html")`,
+${pyReport("source", "pgvector:memories")}`,
     command: (v) =>
-      `memorysec scan pgvector \\\n  --dsn ${v.dsn || "postgresql://localhost/app"} \\\n  --table ${v.table || "memories"} \\\n  --text-column ${v.textColumn || "content"}`,
+      `mimvo scan pgvector \\\n  --dsn ${q(v.dsn || "postgresql://localhost/app")} \\\n  --table ${q(v.table || "memories")} \\\n  --text-column ${q(v.textColumn || "content")}` +
+      (v.embeddingColumn ? ` \\\n  --embedding-column ${q(v.embeddingColumn)}` : ""),
   },
   pinecone: {
     id: "pinecone",
@@ -347,37 +408,115 @@ report.write_html("security-report.html")`,
     monogram: "Pc",
     kind: "Serverless index",
     noun: "index",
-    description: "Scan vectors and metadata in a Pinecone index namespace.",
+    description: "Scan vectors and metadata in one namespace of a Pinecone index.",
     access: "Lists and fetches vectors with metadata. Never upserts or deletes.",
+    extra: "pinecone",
     fields: [
       { key: "index", label: "Index", placeholder: "agent-memory", required: true },
-      { key: "namespace", label: "Namespace", placeholder: "production" },
-      {
-        key: "apiKey",
-        label: "API key",
-        placeholder: "Read-scoped API key",
-        secret: true,
-        required: true,
-        hint: "Use a key scoped to read access. Keys stay in this browser tab.",
-      },
+      { key: "namespace", label: "Namespace", placeholder: "prod" },
+      { key: "textField", label: "Text field", placeholder: "content" },
     ],
-    demo: { index: "agent-memory", namespace: "production", apiKey: "demo-read-only" },
+    demo: { index: "agent-memory", namespace: "prod", textField: "content" },
     resourceKey: "index",
     endpointKey: "namespace",
     flags: [
-      { flag: "--index", description: "Pinecone index name." },
-      { flag: "--namespace", description: "Namespace to scan. Defaults to all namespaces." },
-      { flag: "--report", description: "Write an HTML report to this path." },
+      { flag: "--index", description: "Index name." },
+      { flag: "--namespace", description: "Namespace to scan. Default is the default namespace." },
+      { flag: "--api-key", description: "API key. Defaults to PINECONE_API_KEY; use a read-scoped key." },
+      { flag: "--host", description: "Index host, for serverless indexes." },
+      { flag: "--text-field", description: "Metadata field that holds the text." },
     ],
-    python: `from memorysec import Scanner
-from memorysec.sources import PineconeSource
+    python: `from pathlib import Path
+
+from mimvo import Mimvo
+from mimvo.scan import PineconeScanSource, render_html
 
 # Reads PINECONE_API_KEY from the environment.
-source = PineconeSource(index="agent-memory", namespace="production")
-report = Scanner().scan(source)
-report.write_html("report.html")`,
+source = PineconeScanSource(index="agent-memory", namespace="prod", text_field="content")
+${pyReport("source", "pinecone:agent-memory")}`,
     command: (v) =>
-      `memorysec scan pinecone \\\n  --index ${v.index || "agent-memory"} \\\n  --namespace ${v.namespace || "production"}`,
+      `mimvo scan pinecone \\\n  --index ${q(v.index || "agent-memory")}` +
+      (v.namespace ? ` \\\n  --namespace ${q(v.namespace)}` : "") +
+      (v.textField ? ` \\\n  --text-field ${q(v.textField)}` : ""),
+  },
+  langchain: {
+    id: "langchain",
+    name: "LangChain / LangGraph",
+    slug: "langchain",
+    monogram: "LC",
+    kind: "Your own store object",
+    noun: "store",
+    description: "Scan a LangChain vector store or a LangGraph / LangMem memory store your code already builds.",
+    access: "Lists and fetches documents or items. Never adds, updates, or deletes.",
+    extra: "langchain",
+    fields: [
+      {
+        key: "factory",
+        label: "Factory (module:attr)",
+        placeholder: "myapp.memory:get_vector_store",
+        required: true,
+        hint: "A store, or a function that returns one, imported from the current directory, like uvicorn app:app.",
+      },
+      { key: "namespace", label: "Namespace", placeholder: "memories/alice", hint: "LangGraph stores only." },
+    ],
+    demo: { factory: "myapp.memory:store", namespace: "memories" },
+    resourceKey: "namespace",
+    endpointKey: "factory",
+    flags: [
+      { flag: "--factory", description: "module:attr of a store, or of a function or class that returns one." },
+      { flag: "--namespace", description: "LangGraph namespace prefix, such as memories/alice." },
+      { flag: "--text-field", description: "Key in each LangGraph item that holds the text." },
+    ],
+    python: `from pathlib import Path
+
+from langgraph.store.memory import InMemoryStore
+
+from mimvo import Mimvo
+from mimvo.scan import LangGraphStoreScanSource, render_html
+
+store: InMemoryStore = ...  # the store your agent writes to
+source = LangGraphStoreScanSource(store, namespace=("memories",))
+${pyReport("source", "langgraph:memories")}`,
+    command: (v) =>
+      `mimvo scan langchain \\\n  --factory ${q(v.factory || "myapp.memory:store")}` +
+      (v.namespace ? ` \\\n  --namespace ${q(v.namespace)}` : ""),
+  },
+  mem0: {
+    id: "mem0",
+    name: "mem0",
+    slug: "mem0",
+    monogram: "m0",
+    kind: "Open source or platform",
+    noun: "memory store",
+    description: "Scan mem0's open-source Memory through its config file, or the hosted platform by user.",
+    access: "Reads with get_all and the vector store's list. Never adds, updates, or deletes memories.",
+    extra: "mem0",
+    fields: [
+      { key: "config", label: "Config file", placeholder: "mem0_config.yaml", required: true, hint: "The file your app passes to Memory.from_config." },
+      { key: "userId", label: "User id", placeholder: "alice", hint: "Leave empty to read the whole store." },
+    ],
+    demo: { config: "mem0_config.yaml", userId: "" },
+    resourceKey: "userId",
+    endpointKey: "config",
+    flags: [
+      { flag: "--config", description: "mem0 config file (open source)." },
+      { flag: "--api-key", description: "mem0 platform key. Defaults to MEM0_API_KEY." },
+      { flag: "--user-id", description: "Only this user's memories. One of the ids is required on the platform." },
+      { flag: "--agent-id", description: "Only this agent's memories." },
+      { flag: "--run-id", description: "Only this run's memories." },
+    ],
+    python: `from pathlib import Path
+
+from mem0 import Memory
+
+from mimvo import Mimvo
+from mimvo.scan import Mem0ScanSource, render_html
+
+memory = Memory.from_config(config)  # the same config your app uses
+source = Mem0ScanSource(memory)
+${pyReport("source", "mem0:all")}`,
+    command: (v) =>
+      `mimvo scan mem0 \\\n  --config ${q(v.config || "mem0_config.yaml")}` + (v.userId ? ` \\\n  --user-id ${q(v.userId)}` : ""),
   },
   jsonl: {
     id: "jsonl",
@@ -386,27 +525,44 @@ report.write_html("report.html")`,
     monogram: "{}",
     kind: "File export",
     noun: "file",
-    description: "Scan a newline-delimited JSON export of any memory store.",
+    description: "Scan a JSON Lines export of any store. Only content is required per line.",
     access: "Reads the export line by line. The file is opened read-only.",
-    fields: [
-      { key: "file", label: "Export file", placeholder: "./exports/agent_memory.jsonl", required: true },
-      { key: "textField", label: "Text field", placeholder: "text", required: true },
-    ],
-    demo: { file: "./exports/agent_memory.jsonl", textField: "text" },
+    fields: [{ key: "file", label: "Export file", placeholder: "./exports/agent_memory.jsonl", required: true, hint: "Use - to read from stdin." }],
+    demo: { file: "./exports/agent_memory.jsonl" },
     resourceKey: "file",
     endpointKey: "file",
-    flags: [
-      { flag: "--file", description: "Path to the .jsonl export." },
-      { flag: "--text-field", description: "JSON field holding the memory text." },
-      { flag: "--report", description: "Write an HTML report to this path." },
-    ],
-    python: `from memorysec import Scanner
-from memorysec.sources import JsonlSource
+    flags: [{ flag: "PATH", description: "JSON Lines file, or - for stdin. Keys: id, content, metadata, embedding, created_at." }],
+    python: `from pathlib import Path
 
-source = JsonlSource(path="./exports/agent_memory.jsonl", text_field="text")
-report = Scanner().scan(source)
-report.write_html("report.html")`,
-    command: (v) =>
-      `memorysec scan jsonl \\\n  --file ${v.file || "./exports/agent_memory.jsonl"} \\\n  --text-field ${v.textField || "text"}`,
+from mimvo import Mimvo
+from mimvo.scan import JsonlScanSource, render_html
+
+source = JsonlScanSource("./exports/agent_memory.jsonl")
+${pyReport("source", "jsonl:./exports/agent_memory.jsonl")}`,
+    command: (v) => `mimvo scan jsonl ${q(v.file || "./exports/agent_memory.jsonl")}`,
   },
 };
+
+/** `pip install` line for a store, with its extra. */
+export function installCommand(store: StoreId) {
+  const extra = stores[store].extra;
+  return extra ? `pip install "mimvo[${extra}]"` : "pip install mimvo";
+}
+
+/** Map a `ScanReport.source` label (`qdrant:agent_memory`) to a store. */
+export function storeFromSource(source: string): { store: StoreId | null; resource: string } {
+  const i = source.indexOf(":");
+  const prefix = i > 0 ? source.slice(0, i) : "";
+  const resource = i > 0 ? source.slice(i + 1) : source;
+  const map: Record<string, StoreId> = {
+    chroma: "chroma",
+    qdrant: "qdrant",
+    pgvector: "pgvector",
+    pinecone: "pinecone",
+    langchain: "langchain",
+    langgraph: "langchain",
+    mem0: "mem0",
+    jsonl: "jsonl",
+  };
+  return { store: map[prefix] ?? null, resource: resource || "memory" };
+}

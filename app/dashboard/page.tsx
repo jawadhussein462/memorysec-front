@@ -3,7 +3,8 @@ import { DashboardApp } from "@/components/dashboard/dashboard-app";
 
 export const metadata: Metadata = {
   title: "Demo dashboard",
-  description: "Interactive MemorySec demo: browse a sample scan of an AI agent's long-term memory.",
+  description:
+    "Interactive Mimvo demo: browse a sample scan of an AI agent's long-term memory, or open your own mimvo --json report in the browser.",
 };
 
 export default function DashboardPage() {

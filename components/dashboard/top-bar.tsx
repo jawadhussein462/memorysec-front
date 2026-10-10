@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Copy, Database, Download, Ellipsis, FileSearch, LoaderCircle, Menu, Plus } from "lucide-react";
+import { BookOpen, CircleAlert, Copy, Database, Download, Ellipsis, FileSearch, FileUp, LoaderCircle, Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,9 +15,11 @@ export function TopBar({
   workspace,
   source,
   scanning,
+  complete = true,
   onMenu,
   onNewScan,
   onExport,
+  onImport,
   onCopyCommand,
   onViewScan,
   preview = false,
@@ -25,9 +27,11 @@ export function TopBar({
   workspace: string;
   source: string;
   scanning: boolean;
+  complete?: boolean;
   onMenu?: () => void;
   onNewScan?: () => void;
   onExport?: () => void;
+  onImport?: () => void;
   onCopyCommand?: () => void;
   onViewScan?: () => void;
   preview?: boolean;
@@ -65,18 +69,30 @@ export function TopBar({
             <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
             <span className="sr-only @lg/main:not-sr-only">Scanning…</span>
           </span>
-        ) : (
+        ) : complete ? (
           <span
             role="status"
             className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[5px] border border-safe/30 bg-safe/10 px-2 text-xs font-medium text-safe"
           >
             <span className="size-1.5 rounded-full bg-safe" aria-hidden="true" />
-            <span className="sr-only @lg/main:not-sr-only">Scan completed</span>
+            <span className="sr-only @lg/main:not-sr-only">Scan complete</span>
+          </span>
+        ) : (
+          <span
+            role="status"
+            className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[5px] border border-sev-medium/30 bg-sev-medium/10 px-2 text-xs font-medium text-sev-medium"
+          >
+            <CircleAlert className="size-3.5" aria-hidden="true" />
+            <span className="sr-only @lg/main:not-sr-only">Scan incomplete</span>
           </span>
         )}
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={onImport} tabIndex={tab} aria-label="Open a mimvo JSON report">
+          <FileUp />
+          <span className="hidden @4xl/main:inline">Open report</span>
+        </Button>
         <Button variant="secondary" size="sm" onClick={onExport} tabIndex={tab} aria-label="Export report as JSON">
           <Download />
           <span className="hidden @2xl/main:inline">Export report</span>
@@ -95,6 +111,10 @@ export function TopBar({
             <DropdownMenuItem onSelect={onCopyCommand}>
               <Copy className="text-muted-foreground" />
               Copy CLI command
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onImport}>
+              <FileUp className="text-muted-foreground" />
+              Open a --json report…
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

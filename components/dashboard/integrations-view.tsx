@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { ChevronRight, Lock, Play } from "lucide-react";
-import { CopyButton, ShellCommand } from "@/components/security/code";
+import { CommandBox, CopyButton, ShellCommand } from "@/components/security/code";
 import { StoreGlyph } from "@/components/security/store-glyph";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { STORE_ORDER, stores } from "@/lib/catalog";
+import { STORE_ORDER, installCommand, stores } from "@/lib/catalog";
 import type { StoreId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "./panel";
@@ -19,7 +19,7 @@ export function IntegrationsView({ onScanSource }: { onScanSource: (store: Store
     <div className="space-y-5">
       <PageHeading
         title="Integrations"
-        description="Read-only connectors for the memory stores agents use. Your database remains the source of truth."
+        description="Scan sources built into the mimvo CLI and Python package. All of them are read-only; your store remains the source of truth."
       />
 
       <ul className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
@@ -91,7 +91,7 @@ export function IntegrationsView({ onScanSource }: { onScanSource: (store: Store
 function IntegrationDetail({ store, onScan }: { store: StoreId; onScan: () => void }) {
   const [tab, setTab] = useState<"cli" | "python">("cli");
   const s = stores[store];
-  const command = `${s.command(s.demo)} \\\n  --report report.html`;
+  const command = `${s.command(s.demo)} \\\n  --report report.html \\\n  --json findings.json`;
   const code = tab === "cli" ? command : s.python;
 
   return (
@@ -123,6 +123,11 @@ function IntegrationDetail({ store, onScan }: { store: StoreId; onScan: () => vo
         </div>
 
         <section>
+          <h3 className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">Install</h3>
+          <CommandBox command={installCommand(store)} />
+        </section>
+
+        <section>
           <div className="mb-2.5 flex items-center justify-between">
             <div role="tablist" aria-label="Example" className="flex h-8 items-center rounded-md border p-0.5">
               {(["cli", "python"] as const).map((t) => (
@@ -152,7 +157,9 @@ function IntegrationDetail({ store, onScan }: { store: StoreId; onScan: () => vo
         </section>
 
         <section>
-          <h3 className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">Options</h3>
+          <h3 className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">
+            Options <span className="font-normal">· plus --report, --json, --sarif, --markdown, --fail-on and --sample on every source</span>
+          </h3>
           <dl className="divide-y rounded-lg border text-[13px]">
             {s.flags.map((f) => (
               <div key={f.flag} className="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 px-3.5 py-2.5">

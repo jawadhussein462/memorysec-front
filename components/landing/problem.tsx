@@ -95,7 +95,7 @@ export function Problem() {
             <div className="relative rounded-xl border border-dashed border-foreground/35 p-2 pt-8">
               <div className="absolute left-3 top-2.5 flex items-center gap-1.5 font-mono text-[11px] text-foreground">
                 <LogoMark className="size-3.5" />
-                MemorySec audit · read-only
+                mimvo scan · read-only
               </div>
               <Node step={STEPS[2]} className="h-auto">
                 <ul className="mt-3 space-y-1 font-mono text-[11.5px]">
@@ -104,13 +104,13 @@ export function Problem() {
                       key={r.id}
                       className={cn(
                         "flex items-center justify-between gap-2 rounded-[4px] border px-2 py-1",
-                        r.flagged ? "border-sev-critical/35 bg-sev-critical/[0.06]" : "border-transparent bg-muted/70",
+                        r.flagged ? "border-sev-high/35 bg-sev-high/[0.06]" : "border-transparent bg-muted/70",
                       )}
                     >
                       <span>{r.id}</span>
                       {r.flagged ? (
-                        <span className="inline-flex items-center gap-1.5 text-sev-critical">
-                          <SeverityMeter severity="critical" />
+                        <span className="inline-flex items-center gap-1.5 text-sev-high">
+                          <SeverityMeter severity="high" />
                           flagged
                         </span>
                       ) : (

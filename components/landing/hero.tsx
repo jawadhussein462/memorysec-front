@@ -22,8 +22,8 @@ export function Hero() {
         <div className="mt-10 grid grid-cols-1 gap-12 lg:mt-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
           <div className="flex flex-col">
             <p className="max-w-[33rem] text-[17px] leading-[1.6] text-muted-foreground">
-              Scan long-term AI memory for poisoned facts, persistent prompt injections, leaked secrets, privacy risks,
-              contradictions, amplification attacks, and unsafe authority changes.
+              Mimvo scans the store your agent already uses for poisoned facts, hidden instructions, and leaked secrets,
+              then tells you which records to review, quarantine, or delete. Reports for people and for CI.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
@@ -36,7 +36,7 @@ export function Hero() {
                 </a>
               </Button>
             </div>
-            <p className="mt-5 font-mono text-xs text-muted-foreground">Local-first · Read-only · Open source</p>
+            <p className="mt-5 font-mono text-xs text-muted-foreground">Read-only · Offline by default · Open source</p>
 
             <div className="mt-10 border-t pt-6 lg:mt-auto">
               <p className="text-[13px] text-muted-foreground">Connects read-only to</p>

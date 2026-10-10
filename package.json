@@ -1,14 +1,15 @@
 {
-  "name": "memorysec-web",
+  "name": "mimvo-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Landing page and interactive demo dashboard for MemorySec, a security scanner for AI-agent memory.",
+  "description": "Landing page and dashboard for Mimvo, a security scanner for AI agent memory. Opens mimvo --json reports in the browser.",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync-rules": "python scripts/sync-rules.py"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",

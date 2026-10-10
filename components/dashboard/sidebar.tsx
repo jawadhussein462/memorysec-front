@@ -24,6 +24,7 @@ export function SidebarContent({
   findingsCount,
   workspace,
   source,
+  imported = false,
   preview = false,
 }: {
   view: DashboardView;
@@ -31,13 +32,14 @@ export function SidebarContent({
   findingsCount: number;
   workspace: string;
   source: string;
+  imported?: boolean;
   preview?: boolean;
 }) {
   const tab = preview ? -1 : undefined;
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 shrink-0 items-center border-b px-4">
-        <Link href="/" className="rounded-sm" aria-label="MemorySec home" tabIndex={tab}>
+        <Link href="/" className="rounded-sm" aria-label="Mimvo home" tabIndex={tab}>
           <Logo />
         </Link>
       </div>
@@ -45,8 +47,10 @@ export function SidebarContent({
       <div className="px-3 pt-3">
         <div className="rounded-md border bg-muted/40 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground">Demo workspace</span>
-            <span className="rounded-[3px] border border-info/30 bg-info/10 px-1 font-mono text-[10px] text-info">demo</span>
+            <span className="text-[11px] text-muted-foreground">{imported ? "Your report" : "Demo workspace"}</span>
+            <span className="rounded-[3px] border border-info/30 bg-info/10 px-1 font-mono text-[10px] text-info">
+              {imported ? "local file" : "demo"}
+            </span>
           </div>
           <div className="mt-1 truncate text-[13px] font-medium">{workspace}</div>
           <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{source}</div>

@@ -1,35 +1,53 @@
 "use client";
 
-import { ArrowLeft, ChevronRight, Download, Lock, Plus } from "lucide-react";
+import { ArrowLeft, ChevronRight, Download, FileUp, Lock, Plus } from "lucide-react";
 import { RiskBadge } from "@/components/security/severity";
 import { StoreGlyph } from "@/components/security/store-glyph";
 import { Button } from "@/components/ui/button";
 import { stores } from "@/lib/catalog";
-import { riskLevel } from "@/lib/report";
+import { flaggedCount, formatDuration, isComplete, riskLevel, sourceLabel } from "@/lib/report";
 import type { Finding, Scan } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 import { PageHeading } from "./panel";
 import { ReportBody } from "./report-body";
 
+function StatusDot({ scan }: { scan: Scan }) {
+  const complete = isComplete(scan);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={complete ? "size-1.5 rounded-full bg-safe" : "size-1.5 rounded-full bg-sev-medium"} aria-hidden="true" />
+      {complete ? "Complete" : "Incomplete"}
+    </span>
+  );
+}
+
 export function ScansList({
   scans,
   onOpen,
   onNewScan,
+  onImport,
 }: {
   scans: Scan[];
   onOpen: (id: string) => void;
   onNewScan: () => void;
+  onImport: () => void;
 }) {
   return (
     <div className="space-y-5">
       <PageHeading
         title="Scans"
-        description="Each scan is a read-only pass over one memory source. Reports stay on this machine."
+        description="Each scan is a read-only pass over one memory source. Reports stay in this browser."
         actions={
-          <Button size="sm" onClick={onNewScan}>
-            <Plus />
-            New scan
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={onImport}>
+              <FileUp />
+              Open report
+            </Button>
+            <Button size="sm" onClick={onNewScan}>
+              <Plus />
+              New scan
+            </Button>
+          </>
         }
       />
       <div className="overflow-hidden rounded-lg border bg-card">
@@ -41,7 +59,7 @@ export function ScansList({
                 <th scope="col" className="py-2.5 pr-3 font-medium">Source</th>
                 <th scope="col" className="py-2.5 pr-3 text-right font-medium">Records</th>
                 <th scope="col" className="py-2.5 pr-3 text-right font-medium">Flagged</th>
-                <th scope="col" className="py-2.5 pr-3 font-medium">Risk</th>
+                <th scope="col" className="py-2.5 pr-3 font-medium">Worst</th>
                 <th scope="col" className="py-2.5 pr-3 font-medium">Status</th>
                 <th scope="col" className="py-2.5 pr-3 font-medium">Completed</th>
                 <th scope="col" className="w-10 py-2.5 pr-4"><span className="sr-only">Open</span></th>
@@ -63,25 +81,29 @@ export function ScansList({
                   className="group cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/45 focus-visible:bg-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <td className="py-3 pl-4 pr-3">
-                    <div className="text-[13.5px] font-medium">{scan.name}</div>
+                    <div className="flex items-center gap-2 text-[13.5px] font-medium">
+                      <span className="max-w-[220px] truncate">{scan.name}</span>
+                      {scan.origin === "imported" && (
+                        <span className="rounded-[3px] border border-info/30 bg-info/10 px-1 font-mono text-[10px] font-normal text-info">
+                          imported
+                        </span>
+                      )}
+                    </div>
                     <div className="font-mono text-[11.5px] text-muted-foreground">{scan.id}</div>
                   </td>
                   <td className="py-3 pr-3">
-                    <span className="inline-flex items-center gap-2 font-mono text-[12px]">
+                    <span className="inline-flex max-w-[260px] items-center gap-2 font-mono text-[12px]">
                       <StoreGlyph store={scan.store} size="sm" />
-                      {stores[scan.store].slug} / {scan.resource}
+                      <span className="truncate">{sourceLabel(scan)}</span>
                     </span>
                   </td>
                   <td className="py-3 pr-3 text-right font-mono text-[12.5px] tabular">{formatNumber(scan.records)}</td>
-                  <td className="py-3 pr-3 text-right font-mono text-[12.5px] tabular">{formatNumber(scan.findings.length)}</td>
+                  <td className="py-3 pr-3 text-right font-mono text-[12.5px] tabular">{formatNumber(flaggedCount(scan.findings))}</td>
                   <td className="py-3 pr-3">
-                    <RiskBadge risk={riskLevel(scan.findings, scan.records)} />
+                    <RiskBadge risk={riskLevel(scan.findings)} />
                   </td>
                   <td className="py-3 pr-3 text-[12.5px]">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-1.5 rounded-full bg-safe" aria-hidden="true" />
-                      {scan.status}
-                    </span>
+                    <StatusDot scan={scan} />
                   </td>
                   <td className="py-3 pr-3 text-[12.5px] text-muted-foreground">{scan.completed}</td>
                   <td className="py-3 pr-4 text-right">
@@ -94,7 +116,8 @@ export function ScansList({
         </div>
       </div>
       <p className="text-[12.5px] text-muted-foreground">
-        Demo history. In the open-source CLI, each run writes its own report file; this view lists them.
+        Demo history. With the CLI, each run writes its own report: pass <code className="font-mono">--json findings.json</code>{" "}
+        and open the file here with Open report. It is read in this browser and never uploaded.
       </p>
     </div>
   );
@@ -117,9 +140,10 @@ export function ScanDetail({
   onExport: () => void;
   onNewScan: () => void;
 }) {
+  const store = scan.store ? stores[scan.store] : null;
   const meta = [
-    { label: "Source", value: stores[scan.store].name },
-    { label: stores[scan.store].noun[0].toUpperCase() + stores[scan.store].noun.slice(1), value: scan.resource, mono: true },
+    { label: "Source", value: store ? store.name : "Unknown source" },
+    { label: store ? store.noun[0].toUpperCase() + store.noun.slice(1) : "Label", value: store ? scan.resource : sourceLabel(scan), mono: true },
     {
       label: "Mode",
       value: (
@@ -130,16 +154,8 @@ export function ScanDetail({
       ),
     },
     { label: "Records", value: formatNumber(scan.records), mono: true },
-    { label: "Duration", value: scan.duration, mono: true },
-    {
-      label: "Status",
-      value: (
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-safe" aria-hidden="true" />
-          {scan.status}
-        </span>
-      ),
-    },
+    { label: "Duration", value: formatDuration(scan.durationSeconds), mono: true },
+    { label: "Status", value: <StatusDot scan={scan} /> },
   ];
 
   return (
@@ -157,12 +173,13 @@ export function ScanDetail({
         title={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {scan.name}
-            <RiskBadge risk={riskLevel(scan.findings, scan.records)} />
+            <RiskBadge risk={riskLevel(scan.findings)} />
           </span>
         }
         description={
           <span className="font-mono text-[12px]">
-            {scan.id} · completed {scan.completedLong}
+            {scan.id} · {scan.origin === "imported" ? `scanned ${scan.completedLong}` : `completed ${scan.completedLong}`} · mimvo{" "}
+            {scan.mimvoVersion} · schema {scan.schemaVersion}
           </span>
         }
         actions={

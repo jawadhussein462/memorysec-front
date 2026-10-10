@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Archivo, IBM_Plex_Mono } from "next/font/google";
+import { site } from "@/lib/site";
 import "./globals.css";
 
 // Fonts are downloaded at build time and self-hosted by Next.js:
@@ -19,13 +20,30 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+const description =
+  "Scan your AI agent's long-term memory for poisoned facts, hidden instructions, and leaked secrets. Read-only, offline by default, open source.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(site.url),
   title: {
-    default: "MemorySec · Memory security for AI agents",
-    template: "%s · MemorySec",
+    default: "Mimvo · Security scanner for AI agent memory",
+    template: "%s · Mimvo",
   },
-  description:
-    "Scan your AI agent's memory for poisoned facts, hidden instructions, leaked data, and memory integrity attacks. Local-first, read-only, open source.",
+  description,
+  applicationName: "Mimvo",
+  keywords: ["AI agent memory", "memory poisoning", "prompt injection", "secret scanning", "RAG security", "vector database"],
+  openGraph: {
+    type: "website",
+    url: site.url,
+    siteName: "Mimvo",
+    title: "Mimvo · Security scanner for AI agent memory",
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Mimvo · Security scanner for AI agent memory",
+    description,
+  },
 };
 
 export const viewport: Viewport = {

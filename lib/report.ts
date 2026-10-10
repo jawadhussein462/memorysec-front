@@ -1,194 +1,149 @@
-import { CATEGORY_ORDER, SEVERITY_ORDER, categories, stores } from "./catalog";
-import { PRODUCTION_ACTIVITY, PRODUCTION_SEEDS, PRODUCTION_SPIKE, materializeFindings } from "./demo-data";
-import type { CategoryId, Finding, FindingFilters, RiskLevel, Scan, Severity, StoreId } from "./types";
+import { ACTION_ORDER, RULE_ORDER, SEVERITY_ORDER, actions, severities, stores } from "./catalog";
+import type { Action, Finding, FindingFilters, RiskLevel, Scan, Severity } from "./types";
 
-export const EMPTY_FILTERS: FindingFilters = { severity: "all", category: "all", query: "" };
+/*
+ * Selectors over a Scan. Each one matches the ScanReport property of the
+ * same name in the mimvo package, so the dashboard and the CLI's HTML,
+ * JSON and Markdown reports always agree on the numbers.
+ */
 
+export const EMPTY_FILTERS: FindingFilters = { severity: "all", rule: "all", query: "" };
+
+export function emptySeverityCounts(): Record<Severity, number> {
+  return { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+}
+
+/** Findings per severity (`ScanReport.by_severity`, with zeros kept). */
 export function severityCounts(findings: Finding[]) {
-  const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+  const counts = emptySeverityCounts();
   for (const f of findings) counts[f.severity]++;
   return counts;
 }
 
-export function categoryCounts(findings: Finding[]) {
-  const counts = Object.fromEntries(CATEGORY_ORDER.map((c) => [c, 0])) as Record<CategoryId, number>;
-  for (const f of findings) counts[f.category]++;
-  return counts;
+/** Findings per rule id, most frequent first (`ScanReport.by_rule`). */
+export function ruleCounts(findings: Finding[]): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const f of findings) counts.set(f.rule, (counts.get(f.rule) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-export function categorySeverityMatrix(findings: Finding[]) {
-  const matrix = Object.fromEntries(
-    CATEGORY_ORDER.map((c) => [c, { critical: 0, high: 0, medium: 0, low: 0 }]),
-  ) as Record<CategoryId, Record<Severity, number>>;
-  for (const f of findings) matrix[f.category][f.severity]++;
+export function ruleSeverityMatrix(findings: Finding[]) {
+  const matrix = new Map<string, Record<Severity, number>>();
+  for (const f of findings) {
+    const row = matrix.get(f.rule) ?? emptySeverityCounts();
+    row[f.severity]++;
+    matrix.set(f.rule, row);
+  }
   return matrix;
 }
 
-export function riskLevel(findings: Finding[], records: number): RiskLevel {
-  if (!findings.length) return "Clean";
-  const c = severityCounts(findings);
-  if (c.critical >= 25 || findings.length / Math.max(records, 1) > 0.02) return "Critical";
-  if (c.critical > 0 || c.high > 0) return "High";
-  if (c.medium > 0) return "Medium";
-  return "Low";
+/** Rules in catalogue order, then any custom codes. */
+export function orderedRules(ids: Iterable<string>) {
+  const set = new Set(ids);
+  const known = RULE_ORDER.filter((r) => set.has(r));
+  const custom = [...set].filter((r) => !RULE_ORDER.includes(r)).sort();
+  return [...known, ...custom];
 }
 
+/** Distinct records with at least one finding (`ScanReport.flagged`). */
+export function flaggedCount(findings: Finding[]) {
+  return new Set(findings.map((f) => f.record)).size;
+}
+
+/** `ScanReport.flagged_pct`: rounded to two decimals. */
+export function flaggedPct(scan: Pick<Scan, "findings" | "records">) {
+  if (!scan.records) return 0;
+  return Math.round((10000 * flaggedCount(scan.findings)) / scan.records) / 100;
+}
+
+/** `ScanReport.action_plan()`: each flagged record once, under the strongest action it needs. */
+export function actionPlan(findings: Finding[]): Record<Action, string[]> {
+  const strongest = new Map<string, Action>();
+  for (const f of findings) {
+    const current = strongest.get(f.record);
+    if (!current || actions[f.action].precedence > actions[current].precedence) strongest.set(f.record, f.action);
+  }
+  const plan: Record<Action, string[]> = { delete: [], quarantine: [], review: [] };
+  for (const [record, action] of strongest) plan[action].push(record);
+  return plan;
+}
+
+/** `ScanReport.worst_severity()`. */
 export function topSeverity(findings: Finding[]): Severity | null {
   const c = severityCounts(findings);
   return SEVERITY_ORDER.find((s) => c[s] > 0) ?? null;
 }
 
-export function relativeTime(sec: number) {
-  if (sec < 60) return "just now";
-  const m = Math.floor(sec / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+export function riskLevel(findings: Finding[]): RiskLevel {
+  const top = topSeverity(findings);
+  return top ? (severities[top].label as RiskLevel) : "Clean";
 }
 
-export function sourceLabel(scan: Pick<Scan, "store" | "resource">) {
-  return `${stores[scan.store].slug} / ${scan.resource}`;
+/** `ScanReport.complete`. */
+export function isComplete(scan: Pick<Scan, "errors">) {
+  return scan.errors.length === 0;
+}
+
+/** Findings sorted the way mimvo writes them: most severe first, then most confident. */
+export function sortFindings(findings: Finding[]) {
+  return [...findings].sort(
+    (a, b) =>
+      severities[b.severity].rank - severities[a.severity].rank ||
+      (b.confidence ?? 0) - (a.confidence ?? 0) ||
+      a.record.localeCompare(b.record),
+  );
+}
+
+export function formatDuration(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds)) return "—";
+  if (seconds < 1) return `${Math.max(1, Math.round(seconds * 1000))} ms`;
+  if (seconds < 60) return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+export function formatConfidence(c: number | null) {
+  return c === null ? "—" : c.toFixed(2);
+}
+
+export function detectorCount(scan: Pick<Scan, "checks">) {
+  return Object.values(scan.checks).reduce((n, d) => n + d.length, 0);
+}
+
+/** `scan.source` as the CLI writes it, such as `qdrant:agent_memory`. */
+export function sourceLabel(scan: Pick<Scan, "source">) {
+  return scan.source || "unknown source";
 }
 
 export function detectorSummary(f: Finding) {
-  return f.detectors.map((d) => d.short).join(" + ");
+  return f.detectors.join(" + ") || "—";
 }
 
 export function filterFindings(findings: Finding[], filters: FindingFilters) {
   const q = filters.query.trim().toLowerCase();
   return findings.filter((f) => {
     if (filters.severity !== "all" && f.severity !== filters.severity) return false;
-    if (filters.category !== "all" && f.category !== filters.category) return false;
+    if (filters.rule !== "all" && f.rule !== filters.rule) return false;
     if (!q) return true;
     return (
       f.record.toLowerCase().includes(q) ||
-      f.headline.toLowerCase().includes(q) ||
-      f.source.toLowerCase().includes(q) ||
-      categories[f.category].finding.toLowerCase().includes(q) ||
-      categories[f.category].label.toLowerCase().includes(q) ||
-      f.detectors.some((d) => d.name.toLowerCase().includes(q))
+      f.rule.toLowerCase().includes(q) ||
+      f.title.toLowerCase().includes(q) ||
+      f.snippet.toLowerCase().includes(q) ||
+      f.check.toLowerCase().includes(q) ||
+      f.detectors.some((d) => d.toLowerCase().includes(q))
     );
   });
 }
 
+/** The `mimvo scan` command that reproduces a scan, with the report flags. */
 export function scanCommand(scan: Pick<Scan, "store" | "resource" | "endpoint">) {
+  if (!scan.store) return "mimvo scan jsonl export.jsonl \\\n  --report report.html \\\n  --json findings.json";
   const meta = stores[scan.store];
   const values: Record<string, string> = { ...meta.demo, [meta.resourceKey]: scan.resource };
   if (meta.endpointKey !== meta.resourceKey) values[meta.endpointKey] = scan.endpoint;
-  return `${meta.command(values)} \\\n  --report report.html`;
+  return `${meta.command(values)} \\\n  --report report.html \\\n  --json findings.json`;
 }
 
-/* ------------------------------------------------------------------ */
-/* JSON output                                                         */
-/* ------------------------------------------------------------------ */
-
-export function findingToJson(f: Finding, scan?: Scan) {
-  return {
-    id: f.id,
-    scan_id: f.scanId,
-    severity: f.severity,
-    category: categories[f.category].key,
-    finding: categories[f.category].finding,
-    headline: f.headline,
-    record_id: f.record,
-    record_kind: f.recordKind,
-    source: scan ? `${stores[scan.store].slug}/${f.source}` : f.source,
-    detectors: f.detectors.map((d) => ({ name: d.name, confidence: d.confidence })),
-    detectors_agreed: f.detectors.length,
-    evidence_masked: f.masked,
-    conflicts_with: f.conflict ? { record_id: f.conflict.record, text: f.conflict.text } : undefined,
-    explanation: f.summary,
-    recommended_action: f.action.toLowerCase(),
-    recommended_action_detail: f.actionDetail,
-    action_applied: false,
-    created: f.created,
-    owasp: f.owasp,
-  };
-}
-
-export function buildReportJson(scan: Scan) {
-  const counts = severityCounts(scan.findings);
-  return JSON.stringify(
-    {
-      generator: "memorysec (demo dashboard)",
-      note: "Demo data. MemorySec connections are read-only; recommended actions are not applied.",
-      scan: {
-        id: scan.id,
-        name: scan.name,
-        source: { type: stores[scan.store].slug, resource: scan.resource },
-        mode: "read-only",
-        records_scanned: scan.records,
-        records_flagged: scan.findings.length,
-        duration: scan.duration,
-        scanners: scan.scanners.map((c) => categories[c].key),
-        secrets_masked: true,
-      },
-      summary: {
-        overall_risk: riskLevel(scan.findings, scan.records).toLowerCase(),
-        severity: counts,
-        categories: Object.fromEntries(
-          Object.entries(categoryCounts(scan.findings)).map(([k, v]) => [categories[k as CategoryId].key, v]),
-        ),
-      },
-      findings: scan.findings.map((f) => findingToJson(f, scan)),
-    },
-    null,
-    2,
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Simulated scans (New scan flow)                                     */
-/* ------------------------------------------------------------------ */
-
-export interface ScanPlan {
-  store: StoreId;
-  values: Record<string, string>;
-  scanners: CategoryId[];
-}
-
-export const DEMO_RECORD_COUNT = 48291;
-
-export function planResource(plan: ScanPlan) {
-  const meta = stores[plan.store];
-  const raw = (plan.values[meta.resourceKey] || meta.demo[meta.resourceKey] || "memory").trim();
-  return plan.store === "jsonl" ? raw.split("/").pop() || raw : raw;
-}
-
-export function planEndpoint(plan: ScanPlan) {
-  const meta = stores[plan.store];
-  return (plan.values[meta.endpointKey] || meta.demo[meta.endpointKey] || "").trim();
-}
-
-/** Findings the demo dataset yields for the selected scanners. */
-export function planFindingSeeds(plan: ScanPlan) {
-  return PRODUCTION_SEEDS.filter((s) => plan.scanners.includes(s.category));
-}
-
-export function createScanFromPlan(plan: ScanPlan): Scan {
-  const id = `scan_${Math.random().toString(16).slice(2, 8)}`;
-  const resource = planResource(plan);
-  const seeds = planFindingSeeds(plan).map((s) => ({
-    ...s,
-    source: s.source === "agent_memory" ? resource : s.source,
-    detectedSec: Math.max(4, Math.round(s.detectedSec * 0.22)),
-  }));
-  return {
-    id,
-    name: "Production Agent Memory",
-    workspace: "Production Agent",
-    store: plan.store,
-    resource,
-    endpoint: planEndpoint(plan),
-    records: DEMO_RECORD_COUNT,
-    duration: "1m 43s",
-    completed: "Just now",
-    completedLong: "just now",
-    status: "Completed",
-    scanners: [...plan.scanners],
-    findings: materializeFindings(seeds, id),
-    activity: PRODUCTION_ACTIVITY,
-    spike: plan.scanners.includes("flooding") ? PRODUCTION_SPIKE : undefined,
-  };
-}
+export { ACTION_ORDER };

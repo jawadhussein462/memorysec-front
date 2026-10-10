@@ -3,6 +3,7 @@ import { ArrowDown, ArrowRight, Bot, Database, Globe, Search, TriangleAlert, typ
 import { LogoMark } from "@/components/brand/logo";
 import { SeverityMeter } from "@/components/security/severity";
 import { cn } from "@/lib/utils";
+import { Reveal } from "./reveal";
 import { SectionHeading } from "./section-heading";
 
 interface Step {
@@ -67,7 +68,7 @@ export function Problem() {
   return (
     <section id="product" aria-labelledby="problem-title" className="scroll-mt-16 border-b">
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-        <SectionHeading id="problem-title" title="Memory is becoming an attack surface.">
+        <SectionHeading id="problem-title" eyebrow="The problem" title="Memory is becoming an attack surface.">
           <p>
             Agents now save facts, preferences, instructions, retrieved knowledge, tool context, and user information
             across sessions, and retrieve it later as trusted context.
@@ -77,6 +78,7 @@ export function Problem() {
           </p>
         </SectionHeading>
 
+        <Reveal delay={80}>
         <ol className="mt-14 grid grid-cols-1 gap-2.5 lg:grid-cols-[1fr_auto_1fr_auto_1.45fr_auto_1fr_auto_1fr] lg:items-stretch lg:gap-3">
           <li className="contents">
             <Node step={STEPS[0]}>
@@ -136,8 +138,9 @@ export function Problem() {
             </Node>
           </li>
         </ol>
+        </Reveal>
 
-        <div className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+        <Reveal className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           <div>
             <h3 className="text-xl font-semibold leading-snug">Why prompt filtering doesn&apos;t cover it</h3>
             <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">
@@ -173,7 +176,7 @@ export function Problem() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

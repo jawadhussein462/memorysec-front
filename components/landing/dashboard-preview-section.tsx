@@ -3,6 +3,7 @@ import { LogoMark } from "@/components/brand/logo";
 import { DashboardPreview } from "@/components/dashboard/dashboard-preview";
 import { Button } from "@/components/ui/button";
 import { ScaledFrame } from "./scaled-frame";
+import { Reveal } from "./reveal";
 import { SectionHeading } from "./section-heading";
 
 const WIDTH = 1280;
@@ -15,12 +16,12 @@ export function DashboardPreviewSection() {
   return (
     <section id="dashboard" aria-labelledby="dashboard-title" className="scroll-mt-16 border-b">
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-        <SectionHeading id="dashboard-title" title="Every finding, one click from its evidence.">
+        <SectionHeading id="dashboard-title" eyebrow="Dashboard" title="Every finding, one click from its evidence.">
           The same report the CLI writes, as an interactive dashboard. Filter by severity or rule, open a finding to see
           which detectors agreed and how to fix it, or drop in the JSON from your own scan.
         </SectionHeading>
 
-        <figure className="mt-14">
+        <Reveal as="figure" delay={80} className="mt-14">
           <div className="overflow-hidden rounded-xl border bg-card shadow-[0_48px_120px_-56px_rgba(8,12,16,0.55)]">
             <div className="flex h-10 items-center gap-3 border-b bg-muted/60 px-4">
               <LogoMark className="size-4 text-muted-foreground" />
@@ -43,9 +44,9 @@ export function DashboardPreviewSection() {
             Preview of the Mimvo dashboard: 48,291 records scanned, 137 flagged, worst severity critical, findings by
             severity and by rule, and the findings table.
           </figcaption>
-        </figure>
+        </Reveal>
 
-        <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+        <Reveal className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Button asChild size="lg">
             <Link href="/dashboard">Open interactive dashboard</Link>
           </Button>
@@ -53,7 +54,7 @@ export function DashboardPreviewSection() {
             No signup. Sample data, or open the file from <code className="font-mono text-[12.5px]">mimvo scan --json</code>;
             it never leaves your browser.
           </span>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

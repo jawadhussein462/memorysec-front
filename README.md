@@ -10,13 +10,16 @@
 
 <h3>Website and dashboard for <a href="https://github.com/jawadhussein462/mimvo">mimvo</a>, the security scanner for AI agent memory.</h3>
 
-**[mimvo.dev](https://mimvo.dev)** · **[Live dashboard](https://mimvo.dev/dashboard)** · [Python package](https://github.com/jawadhussein462/mimvo) · [PyPI](https://pypi.org/project/mimvo/)
+**[mimvo.dev](https://mimvo.dev)** · **[Docs](https://mimvo.dev/docs)** · [Live dashboard](https://mimvo.dev/dashboard) · [Python package](https://github.com/jawadhussein462/mimvo)
 
 </div>
 
 ---
 
-- `/`: landing page
+- `/`: landing page. Two calls to action, as on most open-source startups' sites: **Book a demo** (`/demo`) and
+  **Try open source** (`/docs`), and the docs lead on to GitHub.
+- `/docs`: documentation, ported from the package README. Mimvo is not on PyPI, so every install step uses git and uv.
+- `/demo`: demo request form. It opens the visitor's mail app addressed to `site.contactEmail` (no backend).
 - `/dashboard`: interactive dashboard. It opens on a sample scan, and it opens **your own report**: run
   `mimvo scan ... --json findings.json`, then use **Open report** (or drop the file on the page). The file is parsed in
   the browser and never uploaded.
@@ -43,8 +46,8 @@ The dashboard speaks the package's report format, so the two never disagree.
 After changing rules in the package:
 
 ```bash
-pip install -e ../mimvo   # or: pip install mimvo
-npm run sync-rules        # rewrites lib/rules.generated.ts
+git clone https://github.com/jawadhussein462/mimvo ../mimvo   # once, next to this repo
+npm run sync-rules        # runs scripts/sync-rules.py with the package's uv environment
 ```
 
 ## Getting started
@@ -64,6 +67,9 @@ no requests to Google. Builds therefore need network access once.
 ## Before you launch
 
 - **Links.** `lib/site.ts` points at `github.com/jawadhussein462/mimvo`. Change it if the repository ends up elsewhere.
+- **Demo requests.** `site.contactEmail` in `lib/site.ts` receives demo requests from `/demo`. Make sure that inbox
+  exists, or set `site.demoBookingUrl` to a Cal.com / Calendly link to show a scheduling button instead of the form.
+- **Docs.** `/docs` mirrors the package README (`components/docs/content.tsx`). Update both when the package changes.
 - **OWASP mappings** come from the package (`ASI06`, `LLM01`, `LLM02`); edit them there and re-sync.
 - **Social preview.** `app/opengraph-image.png` is used for link previews. Upload `public/brand/mimvo-social-dark.png`
   as the GitHub social preview too (Settings → General → Social preview).
@@ -76,7 +82,7 @@ no requests to Google. Builds therefore need network access once.
 | --- | --- |
 | `mimvo-banner-light.png`, `mimvo-banner-dark.png` | README headers (2560×800) |
 | `mimvo-social-dark.png`, `mimvo-social-light.png` | Open Graph / GitHub social preview (2560×1280) |
-| `mimvo-icon.svg`, `mimvo-icon.png` | App icon, avatars, PyPI |
+| `mimvo-icon.svg`, `mimvo-icon.png` | App icon, avatars |
 
 The mark is scan corners around three memory records; the flagged segment uses the high-severity color, the only
 color in the brand. The same files live in the package repo under `docs/assets/`.
@@ -95,11 +101,15 @@ Dependency floors are set at the December 2025 patched releases of Next.js and R
 app/
   layout.tsx              fonts, metadata
   page.tsx                landing page
+  docs/page.tsx           documentation
+  demo/page.tsx           book a demo
   dashboard/page.tsx      dashboard (renders <DashboardApp />)
   globals.css             design tokens (light + dark), utilities
   icon.svg, apple-icon.png, opengraph-image.png, twitter-image.png
 components/
-  landing/                landing page sections
+  landing/                landing page sections, header, footer, scroll reveal
+  docs/                   docs layout (sidebar, scrollspy, "On this page") and content
+  demo/                   demo request form
   dashboard/              shell, views, panels, findings table, finding drawer, new-scan flow, report import
   security/               severity meter and badges, masked text, store glyphs, terminal
   brand/                  logo, GitHub mark
@@ -108,6 +118,8 @@ lib/
   types.ts                Finding (ScanFinding), Scan (ScanReport), filters
   rules.generated.ts      rule catalogue, generated from the package
   catalog.ts              severities, checks and detectors, actions, scan sources (flags, CLI, Python)
+  docs.ts                 docs navigation
+  site.ts                 links, demo contact, install commands
   report.ts               selectors that mirror ScanReport properties
   report-io.ts            mimvo JSON report export and import
   sha256.ts               finding fingerprints
@@ -133,8 +145,9 @@ Tokens are HSL triplets, so Tailwind alpha works (`bg-sev-critical/10`).
 viewport breakpoints, which lets the landing-page preview render the real dashboard components at desktop layout
 inside a scaled frame.
 
-**Motion.** The one orchestrated moment is the hero scan, which replays the CLI's real output. Everything else
-responds to user action. `prefers-reduced-motion` is respected.
+**Motion.** The hero fades in on load and replays the CLI's real output; each section fades up once as it scrolls into
+view (`components/landing/reveal.tsx`). Content is only hidden while JavaScript runs, and `prefers-reduced-motion`
+shows everything at once.
 
 ## Demo data
 
@@ -172,7 +185,7 @@ ranges).
 
 | Where | Behavior |
 | --- | --- |
-| Landing CTAs | Navigate to `/dashboard`; "Explore the demo report" opens `/dashboard#findings`. |
+| Landing CTAs | **Book a demo** opens `/demo`; **Try open source** opens `/docs`; "Explore the demo report" opens `/dashboard#findings`. |
 | Sidebar | Switches views and syncs the URL hash (`#overview`, `#scans`, `#findings`, `#integrations`). |
 | Open report | Reads a `--json` report (button, menu, or drag and drop) and opens it as a scan. |
 | Findings table | Search, severity filter, rule filter, pagination, keyboard-accessible rows. |
@@ -180,7 +193,7 @@ ranges).
 | What to do | Record ids under Delete, Quarantine and Review; clicking one filters the table to it. |
 | Finding row | Opens the drawer: masked excerpt, detector scores, evidence, fix steps, OWASP and CWE links. |
 | New scan | Choose a source, toggle checks, copy the equivalent command, watch the simulated run. |
-| Integrations | Install line, CLI and Python examples, and every flag for each source. |
+| Integrations | Install-from-source lines, CLI and Python examples, and every flag for each source. |
 | Export report | Downloads the scan in mimvo's JSON layout. |
 
 ## License

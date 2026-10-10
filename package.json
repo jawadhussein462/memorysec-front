@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "sync-rules": "python scripts/sync-rules.py"
+    "sync-rules": "uv run --project ../mimvo python scripts/sync-rules.py"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",

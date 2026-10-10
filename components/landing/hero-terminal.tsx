@@ -82,10 +82,11 @@ export function HeroTerminal() {
       <div className="overflow-x-auto">
         <Line at={0} t={t}>
           <Prompt />
-          pip install &quot;mimvo[qdrant]&quot;
+          git clone https://github.com/jawadhussein462/mimvo &amp;&amp; cd mimvo
         </Line>
-        <Line at={420} t={t} className="text-terminal-muted">
-          Successfully installed mimvo-0.1.0
+        <Line at={420} t={t}>
+          <Prompt />
+          uv sync --extra qdrant <span className="text-terminal-muted">&amp;&amp; source .venv/bin/activate</span>
         </Line>
         <Line at={700} t={t} />
         <Line at={820} t={t}>

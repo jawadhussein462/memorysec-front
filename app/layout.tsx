@@ -21,7 +21,7 @@ const mono = IBM_Plex_Mono({
 });
 
 const description =
-  "Scan your AI agent's long-term memory for poisoned facts, hidden instructions, and leaked secrets. Read-only, offline by default, open source.";
+  "Scan your AI agent's long-term memory for poisoned facts, hidden instructions, and leaked secrets. Open source, read-only, offline by default.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -55,7 +55,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Marks the page as scripted before paint, so scroll reveals can start hidden without a flash. */}
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">{children}</body>
     </html>
   );

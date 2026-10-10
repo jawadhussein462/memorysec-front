@@ -2,10 +2,17 @@ import type * as React from "react";
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { SeverityMeter } from "@/components/security/severity";
-import { StoreGlyph } from "@/components/security/store-glyph";
-import { STORE_ORDER, stores } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { Reveal } from "./reveal";
 import { SectionHeading } from "./section-heading";
+
+const CONNECT: [string, string][] = [
+  ["chroma", "--path ./chroma_db --collection agent_memory"],
+  ["qdrant", "--url http://localhost:6333 --collection agent_memory"],
+  ["pgvector", "--dsn postgresql://localhost/app --table memories"],
+  ["mem0", "--config mem0_config.yaml"],
+  ["jsonl", "export.jsonl"],
+];
 
 const DETECTORS = ["heuristic", "gitleaks", "trustrag"];
 const MATRIX: { id: string; hits: boolean[]; verdict: string; flagged: boolean }[] = [
@@ -57,28 +64,32 @@ export function HowItWorks() {
   return (
     <section id="how" aria-labelledby="how-title" className="scroll-mt-16 border-b bg-card/60">
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
-        <SectionHeading id="how-title" title="Connect, scan, fix.">
+        <SectionHeading id="how-title" eyebrow="How it works" title="Connect, scan, fix.">
           A scan is a read-only pass over the memory store. Nothing sits in your agent&apos;s request path, and nothing
           is written back. Add a WriteGuard or RetrieveGuard when you also want to stop bad records in flight.
         </SectionHeading>
 
+        <Reveal delay={80}>
         <ol className="mt-14 grid grid-cols-1 overflow-hidden rounded-xl border bg-card lg:grid-cols-3">
           <li className="flex min-w-0 flex-col gap-6 border-b p-6 lg:border-b-0 lg:border-r lg:p-7">
             <StepHeader n="01" title="Connect">
               Point Mimvo at the store the agent already uses, or at a JSONL export of it.
             </StepHeader>
-            <ul className="mt-auto divide-y rounded-lg border">
-              {STORE_ORDER.map((id) => (
-                <li key={id} className="flex items-center gap-2.5 px-3 py-2 text-[13px]">
-                  <StoreGlyph store={id} size="sm" />
-                  <span>{stores[id].name}</span>
-                  <span className="ml-auto inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                    <Lock className="size-3" aria-hidden="true" />
-                    read-only
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-auto overflow-hidden rounded-lg border">
+              <ul className="divide-y font-mono text-[11.5px]">
+                {CONNECT.map(([source, arg]) => (
+                  <li key={source} className="flex items-baseline gap-1.5 overflow-hidden whitespace-nowrap px-3 py-2">
+                    <span className="text-muted-foreground">mimvo scan</span>
+                    <span className="font-medium">{source}</span>
+                    <span className="truncate text-muted-foreground">{arg}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center gap-1.5 border-t bg-muted/40 px-3 py-2 text-[11.5px] text-muted-foreground">
+                <Lock className="size-3" aria-hidden="true" />
+                Read-only: list and fetch, never write
+              </div>
+            </div>
           </li>
 
           <li className="flex min-w-0 flex-col gap-6 border-b p-6 lg:border-b-0 lg:border-r lg:p-7">
@@ -149,6 +160,7 @@ export function HowItWorks() {
             </p>
           </li>
         </ol>
+        </Reveal>
 
         <div className="mt-8">
           <Link

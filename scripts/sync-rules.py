@@ -4,8 +4,8 @@ The dashboard shows the same titles, severities, actions, OWASP items, CWE ids
 and fix steps as `mimvo scan --report`. Run this after changing
 `mimvo/rules.py` so the two never drift:
 
-    pip install -e ../mimvo        # or: pip install mimvo
-    python scripts/sync-rules.py
+    git clone https://github.com/jawadhussein462/mimvo ../mimvo   # once
+    npm run sync-rules   # uv run --project ../mimvo python scripts/sync-rules.py
 """
 
 from __future__ import annotations

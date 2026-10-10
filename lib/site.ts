@@ -11,7 +11,7 @@ export const site = {
   /** "Book a demo" lands on the demo request page. */
   demo: "/demo",
   /**
-   * Where demo requests are sent. The form opens the visitor's mail app addressed here.
+   * Where demo requests are emailed. `/api/demo` delivers the form here.
    * Set `demoBookingUrl` to a Cal.com / Calendly link to show a scheduling button instead of the form.
    */
   contactEmail: "jawadhussein462@gmail.com",

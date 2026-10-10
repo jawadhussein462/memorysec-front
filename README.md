@@ -19,7 +19,7 @@
 - `/`: landing page. Two calls to action, as on most open-source startups' sites: **Book a demo** (`/demo`) and
   **Try open source** (`/docs`), and the docs lead on to GitHub.
 - `/docs`: documentation, ported from the package README. Mimvo is not on PyPI, so every install step uses git and uv.
-- `/demo`: demo request form. It opens the visitor's mail app addressed to `site.contactEmail` (no backend).
+- `/demo`: demo request form. Submitting it emails `site.contactEmail` (`/api/demo`).
 - `/dashboard`: interactive dashboard. It opens on a sample scan, and it opens **your own report**: run
   `mimvo scan ... --json findings.json`, then use **Open report** (or drop the file on the page). The file is parsed in
   the browser and never uploaded.
@@ -67,8 +67,9 @@ no requests to Google. Builds therefore need network access once.
 ## Before you launch
 
 - **Links.** `lib/site.ts` points at `github.com/jawadhussein462/mimvo`. Change it if the repository ends up elsewhere.
-- **Demo requests.** `site.contactEmail` in `lib/site.ts` receives demo requests from `/demo`. Make sure that inbox
-  exists, or set `site.demoBookingUrl` to a Cal.com / Calendly link to show a scheduling button instead of the form.
+- **Demo requests.** `site.contactEmail` in `lib/site.ts` receives demo requests from `/demo`. Sending uses that
+  Gmail account over SMTP, with `GMAIL_APP_PASSWORD` in `.env.local` (a Google app password, not the account
+  password). Or set `site.demoBookingUrl` to a Cal.com / Calendly link to show a scheduling button instead of the form.
 - **Docs.** `/docs` mirrors the package README (`components/docs/content.tsx`). Update both when the package changes.
 - **OWASP mappings** come from the package (`ASI06`, `LLM01`, `LLM02`); edit them there and re-sync.
 - **Social preview.** `app/opengraph-image.png` is used for link previews. Upload `public/brand/mimvo-social-dark.png`

@@ -24,11 +24,14 @@ function Field({ label, htmlFor, optional, children }: { label: string; htmlFor:
 }
 
 /**
- * Demo request. The site has no backend, so the form opens the visitor's mail app with the request
- * filled in, addressed to `site.contactEmail`. With `site.demoBookingUrl` set, a scheduling link is shown instead.
+ * Demo request. Submitting posts to `/api/demo`, which emails `site.contactEmail`.
+ * With `site.demoBookingUrl` set, a scheduling link is shown instead.
  */
 export function DemoForm() {
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [replyEmail, setReplyEmail] = useState("");
+  const [error, setError] = useState("");
 
   if (site.demoBookingUrl) {
     return (
@@ -47,44 +50,58 @@ export function DemoForm() {
     );
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const get = (k: string) => String(data.get(k) ?? "").trim();
-    const company = get("company");
-    const subject = `Mimvo demo request${company ? `: ${company}` : ""}`;
-    const lines = [`Name: ${get("name")}`, `Work email: ${get("email")}`, `Company: ${company}`];
-    if (get("role")) lines.push(`Role: ${get("role")}`);
-    lines.push(`Memory store: ${get("store")}`, "", get("message") || "I'd like to see a demo of Mimvo.");
-    const body = lines.join("\n");
-    window.location.href = `mailto:${site.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    setSent(true);
+    const email = get("email");
+    setSending(true);
+    setError("");
+    try {
+      const response = await fetch("/api/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: get("name"),
+          email,
+          company: get("company"),
+          role: get("role"),
+          store: get("store"),
+          message: get("message"),
+          company_website: get("company_website"),
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setError(payload.error || "The request could not be sent. Try again in a moment.");
+        return;
+      }
+      setReplyEmail(email);
+      setSent(true);
+    } catch {
+      setError("The request could not be sent. Try again in a moment.");
+    } finally {
+      setSending(false);
+    }
   }
 
   if (sent) {
     return (
       <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8" role="status">
         <CircleCheck className="size-6 text-safe" aria-hidden="true" />
-        <h2 className="mt-4 text-[1.25rem] font-semibold">Almost there</h2>
+        <h2 className="mt-4 text-[1.25rem] font-semibold">Request sent</h2>
         <p className="mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
-          Your email app should have opened with the request filled in. Send it and we&apos;ll reply with times for a call.
-        </p>
-        <p className="mt-4 text-[14px] leading-relaxed">
-          Nothing opened? Email{" "}
-          <a href={`mailto:${site.contactEmail}`} className="font-medium underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground">
-            {site.contactEmail}
-          </a>{" "}
-          directly.
+          We emailed the request to the Mimvo team. We&apos;ll reply to {replyEmail} with times for a call.
         </p>
         <Button variant="secondary" className="mt-6" onClick={() => setSent(false)}>
-          Edit the request
+          Send another request
         </Button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border bg-card p-6 shadow-sm sm:p-8" aria-labelledby="demo-form-title">
+    <form onSubmit={onSubmit} className="relative rounded-xl border bg-card p-6 shadow-sm sm:p-8" aria-labelledby="demo-form-title">
       <h2 id="demo-form-title" className="text-[1.25rem] font-semibold">
         Request a demo
       </h2>
@@ -132,12 +149,22 @@ export function DemoForm() {
         </div>
       </div>
 
-      <Button type="submit" size="lg" className="mt-6 w-full">
+      <div className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">
+        <label htmlFor="company-website">Company website</label>
+        <input id="company-website" name="company_website" type="text" tabIndex={-1} autoComplete="off" />
+      </div>
+
+      <Button type="submit" size="lg" className="mt-6 w-full" disabled={sending}>
         <Mail />
-        Request a demo
+        {sending ? "Sending…" : "Request a demo"}
       </Button>
+      {error && (
+        <p role="alert" className="mt-3 text-center text-[13px] leading-relaxed text-sev-high">
+          {error}
+        </p>
+      )}
       <p className="mt-3 text-center text-[12.5px] text-muted-foreground">
-        Opens your email app addressed to {site.contactEmail}. Nothing is sent until you press send.
+        Sends the request to {site.contactEmail}. We&apos;ll reply with times for a 30-minute call.
       </p>
     </form>
   );

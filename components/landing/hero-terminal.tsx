@@ -4,16 +4,18 @@ import { useEffect, useState, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { TerminalFrame } from "@/components/security/code";
 import { usePrefersReducedMotion } from "@/lib/hooks";
-import { clamp, cn, formatNumber } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
-const TOTAL = 48291;
+/* The output below is what `mimvo scan` prints, line for line (format_scan_summary with the findings table). */
+
+const SCAN_DONE = 2900;
 const END = 4700;
-const PROGRESS = { start: 1750, end: 3350 };
-const SEVERITY_ROWS = [
-  { n: 12, label: "critical", tone: "text-sev-critical", bar: "bg-sev-critical" },
-  { n: 31, label: "high", tone: "text-sev-high", bar: "bg-sev-high" },
-  { n: 58, label: "medium", tone: "text-sev-medium", bar: "bg-sev-medium" },
-  { n: 36, label: "low", tone: "text-sev-low", bar: "bg-sev-low" },
+
+const ROWS = [
+  { sev: "critical", tone: "text-sev-critical", rule: "secret_detected       ", rec: "mem_4b7e21", act: "delete    ", conf: "1.00", owasp: "LLM02" },
+  { sev: "high    ", tone: "text-sev-high", rule: "persistent_instruction", rec: "mem_8f293a", act: "review    ", conf: "0.99", owasp: "LLM01" },
+  { sev: "high    ", tone: "text-sev-high", rule: "destination_redirect  ", rec: "mem_5d02af", act: "review    ", conf: "0.95", owasp: "ASI06" },
+  { sev: "high    ", tone: "text-sev-high", rule: "memory_poisoning      ", rec: "mem_19bd82", act: "quarantine", conf: "0.95", owasp: "ASI06" },
 ];
 
 function Line({ at, t, children, className }: { at: number; t: number; children?: ReactNode; className?: string }) {
@@ -51,14 +53,12 @@ export function HeroTerminal() {
     return () => cancelAnimationFrame(raf);
   }, [reduced, run]);
 
-  const p = clamp((t - PROGRESS.start) / (PROGRESS.end - PROGRESS.start));
-  const eased = 1 - Math.pow(1 - p, 2.2);
-  const count = Math.round(TOTAL * eased);
   const done = t >= END;
+  const waiting = t >= 1300 && t < SCAN_DONE;
 
   return (
     <TerminalFrame
-      title="~/agent · memorysec"
+      title="~/agent · mimvo"
       className="self-start"
       actions={
         <button
@@ -79,58 +79,59 @@ export function HeroTerminal() {
         </button>
       }
     >
-      <div>
+      <div className="overflow-x-auto">
         <Line at={0} t={t}>
           <Prompt />
-          pip install memorysec
+          pip install &quot;mimvo[qdrant]&quot;
         </Line>
         <Line at={420} t={t} className="text-terminal-muted">
-          Successfully installed memorysec
+          Successfully installed mimvo-0.1.0
         </Line>
         <Line at={700} t={t} />
         <Line at={820} t={t}>
           <Prompt />
-          memorysec scan qdrant \
+          mimvo scan qdrant --url http://localhost:6333 \
         </Line>
-        <Line at={940} t={t}>{"    --url http://localhost:6333 \\"}</Line>
-        <Line at={1060} t={t}>{"    --collection agent_memory \\"}</Line>
-        <Line at={1180} t={t}>{"    --report report.html"}</Line>
-        <Line at={1300} t={t} />
-        <Line at={1500} t={t}>
-          <span className="text-safe">●</span> <span className="text-terminal-muted">connected</span> qdrant / agent_memory{" "}
-          <span className="text-terminal-muted">(read-only)</span>
+        <Line at={940} t={t}>{"    --collection agent_memory --report report.html"}</Line>
+        <Line at={1060} t={t}>
+          {waiting ? (
+            <span className="inline-block h-[1.05em] w-[0.55em] translate-y-[0.18em] animate-blink bg-terminal-foreground/80" />
+          ) : null}
         </Line>
-        <Line at={PROGRESS.start} t={t} className="flex items-center gap-3">
-          <span className="text-terminal-muted">scanning</span>
-          <span className="relative h-1.5 w-28 overflow-hidden rounded-full bg-white/10 sm:w-40">
-            <span className="absolute inset-y-0 left-0 rounded-full bg-terminal-foreground/80" style={{ width: `${eased * 100}%` }} />
-          </span>
-          <span className="tabular">
-            {formatNumber(count)} / {formatNumber(TOTAL)}
-          </span>
+        <Line at={SCAN_DONE} t={t}>
+          <span className="text-safe">✓</span> Scanned 48,291 records
         </Line>
-        <Line at={PROGRESS.end + 80} t={t} />
-        <Line at={PROGRESS.end + 120} t={t}>
-          <span className="text-safe">✓</span> Scanned {formatNumber(TOTAL)} records
+        <Line at={SCAN_DONE + 140} t={t}>
+          <span className="text-sev-medium">!</span> 137 records flagged (0.28%)
         </Line>
-        <Line at={PROGRESS.end + 260} t={t}>
-          <span className="text-sev-high">!</span> 137 records flagged <span className="text-terminal-muted">(0.28%)</span>
+        <Line at={SCAN_DONE + 260} t={t}>
+          {"  "}
+          <span className="text-sev-critical">• 12 critical</span>
+          {"  "}
+          <span className="text-sev-high">• 31 high</span>
+          {"  "}
+          <span className="text-sev-medium">• 58 medium</span>
+          {"  "}
+          <span className="text-sev-low">• 36 low</span>
         </Line>
-        <Line at={PROGRESS.end + 340} t={t} />
-        {SEVERITY_ROWS.map((row, i) => (
-          <Line key={row.label} at={PROGRESS.end + 420 + i * 110} t={t} className="flex items-center">
-            <span className="w-8 text-right tabular">{row.n}</span>
-            <span className={cn("ml-2 w-16", row.tone)}>{row.label}</span>
-            <span
-              className={cn("ml-2 h-2 rounded-[2px] opacity-80", row.bar)}
-              style={{ width: `${(row.n / 58) * 9}rem` }}
-              aria-hidden="true"
-            />
+        <Line at={SCAN_DONE + 340} t={t} />
+        <Line at={SCAN_DONE + 420} t={t} className="text-terminal-muted">
+          {"  SEVERITY  RULE                    RECORD      ACTION      CONF  OWASP"}
+        </Line>
+        {ROWS.map((r, i) => (
+          <Line key={r.rec} at={SCAN_DONE + 520 + i * 110} t={t}>
+            {"  "}
+            <span className={r.tone}>{r.sev}</span>
+            {`  ${r.rule}  ${r.rec}  ${r.act}  ${r.conf}  ${r.owasp}`}
           </Line>
         ))}
-        <Line at={PROGRESS.end + 900} t={t} />
-        <Line at={PROGRESS.end + 980} t={t}>
-          Report written to <span className="underline decoration-terminal-muted underline-offset-4">report.html</span>
+        <Line at={SCAN_DONE + 1020} t={t} className="text-terminal-muted">
+          {"  ⋮"}
+        </Line>
+        <Line at={SCAN_DONE + 1120} t={t} />
+        <Line at={SCAN_DONE + 1220} t={t}>
+          <span className="text-safe">✓</span> Report written to{" "}
+          <span className="underline decoration-terminal-muted underline-offset-4">report.html</span>
         </Line>
         <Line at={END} t={t}>
           <Prompt />

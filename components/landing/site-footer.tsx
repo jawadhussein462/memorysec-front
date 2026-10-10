@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
-import { CATEGORY_ORDER, STORE_ORDER, categories, stores } from "@/lib/catalog";
+import { CHECK_ORDER, STORE_ORDER, checks, stores } from "@/lib/catalog";
 import { site } from "@/lib/site";
 
 type FooterLink = { label: string; href: string; external?: boolean };
@@ -16,8 +16,11 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
     ],
   },
   {
-    title: "Scanners",
-    links: CATEGORY_ORDER.map((c) => ({ label: categories[c].landing, href: "#scanners" })),
+    title: "Checks",
+    links: [
+      ...CHECK_ORDER.map((c) => ({ label: checks[c].label, href: "#scanners" })),
+      { label: "All finding codes", href: site.rulesDocs, external: true },
+    ],
   },
   {
     title: "Integrations",
@@ -27,6 +30,7 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
     title: "Resources",
     links: [
       { label: "Documentation", href: site.docs, external: true },
+      { label: "PyPI", href: site.pypi, external: true },
       { label: "Install", href: "#install" },
       { label: "Security policy", href: `${site.github}/security/policy`, external: true },
     ],
@@ -78,8 +82,8 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col gap-2 border-t pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-mono">MemorySec · Open source · {site.license}</span>
-          <span>Memory security for AI agents.</span>
+          <span className="font-mono">mimvo · Open source · {site.license}</span>
+          <span>{site.url.replace("https://", "")}</span>
         </div>
       </div>
     </footer>

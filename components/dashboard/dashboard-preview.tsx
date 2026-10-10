@@ -2,11 +2,11 @@
 
 import { initialScans } from "@/lib/demo-data";
 import { EMPTY_FILTERS, sourceLabel } from "@/lib/report";
-import { CategoryPanel } from "./category-panel";
 import { FindingsTable } from "./findings-table";
 import { KpiStrip } from "./kpi-strip";
 import { PageHeading } from "./panel";
 import { PosturePanel } from "./posture-panel";
+import { RulePanel } from "./rule-panel";
 import { SidebarContent } from "./sidebar";
 import { TopBar } from "./top-bar";
 
@@ -45,7 +45,7 @@ export function DashboardPreview({ width = 1280, height = 880 }: { width?: numbe
           <KpiStrip scan={scan} />
           <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">
             <PosturePanel scan={scan} animate={false} />
-            <CategoryPanel findings={scan.findings} scanners={scan.scanners} />
+            <RulePanel findings={scan.findings} limit={5} />
           </div>
           <FindingsTable
             findings={scan.findings}
@@ -53,7 +53,7 @@ export function DashboardPreview({ width = 1280, height = 880 }: { width?: numbe
             onFiltersChange={noop}
             preview
             pageSize={6}
-            title="Recent findings"
+            title="Findings"
           />
         </div>
       </div>

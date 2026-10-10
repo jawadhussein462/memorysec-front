@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Lock } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { FileUp, Lock } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { initialScans } from "@/lib/demo-data";
-import { EMPTY_FILTERS, buildReportJson, scanCommand, sourceLabel } from "@/lib/report";
+import { EMPTY_FILTERS, flaggedCount, isComplete, scanCommand, sourceLabel } from "@/lib/report";
+import { MAX_REPORT_BYTES, ReportImportError, buildReportJson, parseReport, reportFileName } from "@/lib/report-io";
 import type { Finding, FindingFilters, Scan, StoreId } from "@/lib/types";
 import { copyText, downloadFile, formatNumber } from "@/lib/utils";
 import { FindingSheet } from "./finding-sheet";
@@ -32,6 +33,8 @@ export function DashboardApp() {
   const [reportLoading, setReportLoading] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [findingFilters, setFindingFilters] = useState<FindingFilters>(EMPTY_FILTERS);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const activeScan = scans.find((s) => s.id === activeScanId) ?? scans[0];
   const detailScan = detailScanId ? (scans.find((s) => s.id === detailScanId) ?? null) : null;
@@ -103,12 +106,67 @@ export function DashboardApp() {
   };
 
   const exportReport = (scan: Scan = contextScan) => {
-    const filename = `memorysec-${scan.id}.json`;
+    const filename = reportFileName(scan);
     downloadFile(filename, buildReportJson(scan));
     toast.success("Report exported", {
-      description: `${filename} · ${scan.findings.length} findings, secrets masked`,
+      description: `${filename} · mimvo JSON schema ${scan.schemaVersion}, ${scan.findings.length} findings`,
     });
   };
+
+  /* Open a report written by `mimvo scan ... --json`. The file is read here and never uploaded. */
+  const importFile = async (file: File) => {
+    if (file.size > MAX_REPORT_BYTES) {
+      toast.error("Report too large", { description: "Files over 50 MB are not opened in the browser." });
+      return;
+    }
+    try {
+      const { scan, skipped, legacy } = parseReport(await file.text(), file.name);
+      setScans((prev) => [scan, ...prev]);
+      setActiveScanId(scan.id);
+      openScan(scan.id);
+      const notes = [
+        `${formatNumber(scan.records)} records · ${formatNumber(flaggedCount(scan.findings))} flagged`,
+        skipped ? `${skipped} invalid findings skipped` : null,
+        legacy ? "written by MemorySec (schema 1.x)" : null,
+      ].filter(Boolean);
+      toast.success(`Opened ${file.name}`, { description: notes.join(" · ") });
+    } catch (err) {
+      toast.error("Couldn't open this report", {
+        description: err instanceof ReportImportError ? err.message : "The file could not be read.",
+      });
+    }
+  };
+
+  const openImport = () => fileInput.current?.click();
+  const importFileRef = useRef(importFile);
+  importFileRef.current = importFile;
+
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragging(true);
+    };
+    const leave = (e: DragEvent) => {
+      if (e.relatedTarget === null) setDragging(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragging(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) void importFileRef.current(file);
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
 
   const copyCommand = async () => {
     const ok = await copyText(scanCommand(contextScan));
@@ -123,7 +181,7 @@ export function DashboardApp() {
     setReportLoading(true);
     openScan(scan.id);
     toast.success("Scan completed", {
-      description: `${formatNumber(scan.records)} records scanned · ${scan.findings.length} flagged`,
+      description: `${formatNumber(scan.records)} records scanned · ${flaggedCount(scan.findings)} flagged`,
     });
   };
 
@@ -156,7 +214,7 @@ export function DashboardApp() {
           title="Findings"
           description={
             <>
-              {activeScan.findings.length} findings from {activeScan.name}
+              {activeScan.findings.length} findings on {flaggedCount(activeScan.findings)} records from {activeScan.name}
               {reviewedInActive > 0 && ` · ${reviewedInActive} reviewed`}. Actions are recommendations and are never
               applied to the store.
             </>
@@ -174,7 +232,7 @@ export function DashboardApp() {
         />
         <p className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
           <Lock className="size-3.5" aria-hidden="true" />
-          Evidence is masked before it reaches this view. Raw secrets never leave the scanner.
+          Secret values are masked by mimvo before they reach a report. Raw secrets never leave the scanner.
         </p>
       </div>
     );
@@ -190,7 +248,7 @@ export function DashboardApp() {
         onNewScan={() => openNewScan()}
       />
     ) : (
-      <ScansList scans={scans} onOpen={openScan} onNewScan={() => openNewScan()} />
+      <ScansList scans={scans} onOpen={openScan} onNewScan={() => openNewScan()} onImport={openImport} />
     );
   } else {
     content = <IntegrationsView onScanSource={(store) => openNewScan(store)} />;
@@ -202,6 +260,7 @@ export function DashboardApp() {
     findingsCount: activeScan.findings.length,
     workspace: activeScan.workspace,
     source: sourceLabel(activeScan),
+    imported: activeScan.origin === "imported",
   };
 
   return (
@@ -222,9 +281,11 @@ export function DashboardApp() {
             workspace={activeScan.workspace}
             source={sourceLabel(activeScan)}
             scanning={scanning}
+            complete={isComplete(activeScan)}
             onMenu={() => setNavOpen(true)}
             onNewScan={() => openNewScan()}
             onExport={() => exportReport()}
+            onImport={openImport}
             onCopyCommand={copyCommand}
             onViewScan={() => openScan(contextScan.id)}
           />
@@ -257,6 +318,30 @@ export function DashboardApp() {
         onRunningChange={setScanning}
         onComplete={onScanComplete}
       />
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void importFile(file);
+        }}
+      />
+
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-[70] grid place-items-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-foreground/40 bg-card px-10 py-8 text-center">
+            <FileUp className="size-6 text-muted-foreground" aria-hidden="true" />
+            <p className="mt-3 text-[15px] font-medium">Drop a mimvo JSON report</p>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">The file written by --json. It is read here, never uploaded.</p>
+          </div>
+        </div>
+      )}
 
       <Toaster
         theme="dark"

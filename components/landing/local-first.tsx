@@ -2,23 +2,24 @@ import { EyeOff, Laptop, Lock } from "lucide-react";
 import { ShellCommand, TerminalFrame, CopyButton } from "@/components/security/code";
 
 const POINTS = [
-  { icon: Lock, title: "Read only", body: "Never mutates the source memory store during scanning." },
-  { icon: Laptop, title: "Local by default", body: "Runs alongside your existing stack. No account, no hosted service." },
-  { icon: EyeOff, title: "Safe reports", body: "Secrets are masked before they appear in scan reports." },
+  { icon: Lock, title: "Read only", body: "Scan sources list and fetch. They never insert, update, or delete." },
+  { icon: Laptop, title: "Offline by default", body: "The default detectors are phrase rules and vector statistics. No account, no API key, no model download." },
+  { icon: EyeOff, title: "Safe to forward", body: "Secret values are masked in snippets and never written to findings, JSON, logs, or traces." },
 ];
 
-const COMMAND = `memorysec scan pgvector \\
+const COMMAND = `mimvo scan pgvector \\
   --dsn postgresql://localhost/app \\
   --table memories \\
   --text-column content \\
+  --embedding-column embedding \\
   --report security-report.html`;
 
 const READOUT = [
-  ["source", "pgvector / memories"],
+  ["source", "pgvector:memories"],
   ["connection", "read-only (SELECT)"],
   ["runs on", "this machine"],
   ["llm api key", "not required"],
-  ["batch size", "512 records"],
+  ["batch size", "500 records"],
   ["masking", "on"],
 ];
 
@@ -32,8 +33,9 @@ export function LocalFirst() {
             Your memory doesn&apos;t need to leave your machine.
           </h2>
           <p className="mt-6 max-w-xl text-[16px] leading-[1.65] text-muted-foreground">
-            MemorySec&apos;s default scan can run locally without an LLM API key. Connections are read-only, records stream
-            in batches, and sensitive snippets shown in reports are masked.
+            Mimvo&apos;s default checks run on this machine without an LLM or an API key. Records stream in batches, and
+            secret values are masked before anything is written. Hosted detectors are opt-in and are the only ones that
+            send text out.
           </p>
           <ul className="mt-10 divide-y border-y">
             {POINTS.map(({ icon: Icon, title, body }) => (
@@ -52,7 +54,7 @@ export function LocalFirst() {
 
         <div className="lg:pt-2">
           <TerminalFrame
-            title="~/app · memorysec"
+            title="~/app · mimvo"
             actions={<CopyButton value={COMMAND} label="Copy pgvector scan command" />}
           >
             <ShellCommand command={COMMAND} />
@@ -69,7 +71,8 @@ export function LocalFirst() {
             </div>
           </TerminalFrame>
           <p className="mt-4 text-[13px] text-muted-foreground">
-            The report is a static HTML file. Open it locally, or attach it to a ticket. No upload required.
+            The report is one HTML file with no network requests. Open it locally, attach it to a ticket, or open the JSON
+            version in the dashboard; it is read in your browser and never uploaded.
           </p>
         </div>
       </div>

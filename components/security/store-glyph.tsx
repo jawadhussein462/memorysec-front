@@ -8,7 +8,7 @@ export function StoreGlyph({
   size = "md",
   className,
 }: {
-  store: StoreId;
+  store: StoreId | null;
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
@@ -23,16 +23,18 @@ export function StoreGlyph({
         className,
       )}
     >
-      {stores[store].monogram}
+      {store ? stores[store].monogram : "{}"}
     </span>
   );
 }
+
+const CHIP_LABEL: Partial<Record<StoreId, string>> = { pgvector: "pgvector", langchain: "LangChain / LangGraph" };
 
 export function StoreChip({ store, className }: { store: StoreId; className?: string }) {
   return (
     <span className={cn("inline-flex h-8 items-center gap-2 rounded-md border bg-card pl-1.5 pr-2.5 text-[13px]", className)}>
       <StoreGlyph store={store} size="sm" />
-      {store === "pgvector" ? "pgvector" : stores[store].name}
+      {CHIP_LABEL[store] ?? stores[store].name}
     </span>
   );
 }

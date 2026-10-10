@@ -14,9 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { CATEGORY_ORDER, SEVERITY_ORDER, categories, severities } from "@/lib/catalog";
-import { EMPTY_FILTERS, detectorSummary, filterFindings, relativeTime } from "@/lib/report";
-import type { CategoryId, Finding, FindingFilters, Severity } from "@/lib/types";
+import { SEVERITY_ORDER, checkIcon, owaspId, ruleFor, severities } from "@/lib/catalog";
+import { EMPTY_FILTERS, detectorSummary, emptySeverityCounts, filterFindings, formatConfidence, orderedRules } from "@/lib/report";
+import type { Finding, FindingFilters, Severity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface FindingsTableProps {
@@ -48,29 +48,31 @@ export function FindingsTable({
 }: FindingsTableProps) {
   const [page, setPage] = useState(0);
 
-  useEffect(() => setPage(0), [filters.severity, filters.category, filters.query, findings]);
+  useEffect(() => setPage(0), [filters.severity, filters.rule, filters.query, findings]);
 
   const filtered = useMemo(() => filterFindings(findings, filters), [findings, filters]);
 
   // Counts on each control reflect the other active filters.
   const severityCounts = useMemo(() => {
     const base = filterFindings(findings, { ...filters, severity: "all" });
-    const counts: Record<Severity | "all", number> = { all: base.length, critical: 0, high: 0, medium: 0, low: 0 };
+    const counts: Record<Severity | "all", number> = { all: base.length, ...emptySeverityCounts() };
     for (const f of base) counts[f.severity]++;
     return counts;
   }, [findings, filters]);
 
-  const categoryCounts = useMemo(() => {
-    const base = filterFindings(findings, { ...filters, category: "all" });
-    const counts = Object.fromEntries(CATEGORY_ORDER.map((c) => [c, 0])) as Record<CategoryId, number>;
-    for (const f of base) counts[f.category]++;
-    return { all: base.length, ...counts };
+  const ruleCounts = useMemo(() => {
+    const base = filterFindings(findings, { ...filters, rule: "all" });
+    const counts = new Map<string, number>();
+    for (const f of base) counts.set(f.rule, (counts.get(f.rule) ?? 0) + 1);
+    return { all: base.length, counts };
   }, [findings, filters]);
+  const rules = useMemo(() => orderedRules(findings.map((f) => f.rule)), [findings]);
+  const levels = useMemo(() => SEVERITY_ORDER.filter((s) => s !== "info" || findings.some((f) => f.severity === "info")), [findings]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pages - 1);
   const rows = filtered.slice(current * pageSize, current * pageSize + pageSize);
-  const isFiltered = filters.severity !== "all" || filters.category !== "all" || filters.query.trim() !== "";
+  const isFiltered = filters.severity !== "all" || filters.rule !== "all" || filters.query.trim() !== "";
   const set = (patch: Partial<FindingFilters>) => onFiltersChange({ ...filters, ...patch });
 
   return (
@@ -92,7 +94,7 @@ export function FindingsTable({
               type="search"
               value={filters.query}
               onChange={(e) => set({ query: e.target.value })}
-              placeholder="Search record IDs or findings…"
+              placeholder="Search records, rules, snippets…"
               tabIndex={preview ? -1 : undefined}
               className="h-8 w-full rounded-md border border-input bg-transparent pl-8 pr-7 text-[13px] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-search-cancel-button]:hidden"
             />
@@ -110,7 +112,7 @@ export function FindingsTable({
 
           <div className="scrollbar-thin -mx-1 relative overflow-x-auto px-1 @2xl:mx-0 @2xl:px-0">
             <div role="group" aria-label="Filter by severity" className="flex h-8 w-max items-center rounded-md border p-0.5">
-              {(["all", ...SEVERITY_ORDER] as const).map((s) => {
+              {(["all", ...levels] as const).map((s) => {
                 const active = filters.severity === s;
                 return (
                   <button
@@ -139,33 +141,35 @@ export function FindingsTable({
                 variant="secondary"
                 size="sm"
                 tabIndex={preview ? -1 : undefined}
-                className={cn("justify-between font-normal @2xl:w-auto", filters.category !== "all" && "border-foreground/30")}
+                className={cn("justify-between font-normal @2xl:w-auto", filters.rule !== "all" && "border-foreground/30")}
               >
                 <span className="inline-flex items-center gap-2">
                   <ListFilter className="text-muted-foreground" />
-                  {filters.category === "all" ? "All categories" : categories[filters.category].label}
+                  {filters.rule === "all" ? "All rules" : ruleFor(filters.rule).title}
                 </span>
                 <ChevronDown className="text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel>Memory risk category</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={filters.category}
-                onValueChange={(v) => set({ category: v as CategoryId | "all" })}
-              >
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel>Rule (finding code)</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={filters.rule} onValueChange={(v) => set({ rule: v })}>
                 <DropdownMenuRadioItem value="all">
-                  <span className="flex-1">All categories</span>
-                  <span className="font-mono text-[11px] text-muted-foreground tabular">{categoryCounts.all}</span>
+                  <span className="flex-1">All rules</span>
+                  <span className="font-mono text-[11px] text-muted-foreground tabular">{ruleCounts.all}</span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuSeparator />
-                {CATEGORY_ORDER.map((c) => {
-                  const Icon = categories[c].icon;
+                {rules.map((r) => {
+                  const meta = ruleFor(r);
+                  const Icon = checkIcon(meta.check);
+                  const count = ruleCounts.counts.get(r) ?? 0;
                   return (
-                    <DropdownMenuRadioItem key={c} value={c} disabled={categoryCounts[c] === 0 && filters.category !== c}>
+                    <DropdownMenuRadioItem key={r} value={r} disabled={count === 0 && filters.rule !== r}>
                       <Icon className="text-muted-foreground" />
-                      <span className="flex-1">{categories[c].label}</span>
-                      <span className="font-mono text-[11px] text-muted-foreground tabular">{categoryCounts[c]}</span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate">{meta.title}</span>
+                        <span className="truncate font-mono text-[10.5px] text-muted-foreground">{r}</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-muted-foreground tabular">{count}</span>
                     </DropdownMenuRadioItem>
                   );
                 })}
@@ -181,8 +185,8 @@ export function FindingsTable({
           {filters.severity !== "all" && (
             <FilterChip onRemove={() => set({ severity: "all" })}>{severities[filters.severity].label}</FilterChip>
           )}
-          {filters.category !== "all" && (
-            <FilterChip onRemove={() => set({ category: "all" })}>{categories[filters.category].label}</FilterChip>
+          {filters.rule !== "all" && (
+            <FilterChip onRemove={() => set({ rule: "all" })}>{ruleFor(filters.rule).title}</FilterChip>
           )}
           {filters.query.trim() && <FilterChip onRemove={() => set({ query: "" })}>&ldquo;{filters.query.trim()}&rdquo;</FilterChip>}
           <button
@@ -203,8 +207,20 @@ export function FindingsTable({
               <th scope="col" className="w-[118px] py-2.5 pl-4 pr-3 font-medium">Severity</th>
               <th scope="col" className="py-2.5 pr-3 font-medium">Finding</th>
               <th scope="col" className="w-[132px] py-2.5 pr-3 font-medium">Record</th>
-              <th scope="col" className="w-[132px] py-2.5 pr-3 font-medium">Source</th>
-              <th scope="col" className="w-[178px] py-2.5 pr-3 font-medium">Detectors</th>
+              <th scope="col" className="w-[168px] py-2.5 pr-3 font-medium">Detectors</th>
+              <th scope="col" className="w-[84px] py-2.5 pr-3 text-right font-medium">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help underline decoration-dotted underline-offset-4" tabIndex={preview ? -1 : 0}>
+                      Conf.
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Combined confidence of the detectors that agreed, 1 − Π(1 − score). Below 0.6 a finding is reported one
+                    severity lower.
+                  </TooltipContent>
+                </Tooltip>
+              </th>
               <th scope="col" className="w-[124px] py-2.5 pr-3 font-medium">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -213,12 +229,11 @@ export function FindingsTable({
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    Recommended remediation. MemorySec connections are read-only, so actions are never applied
-                    automatically.
+                    Recommended next step, set by the rule. Mimvo reads the store and never applies it.
                   </TooltipContent>
                 </Tooltip>
               </th>
-              <th scope="col" className="w-[88px] py-2.5 pr-4 text-right font-medium">Detected</th>
+              <th scope="col" className="w-[76px] py-2.5 pr-4 font-medium">OWASP</th>
             </tr>
           </thead>
           <tbody>
@@ -235,7 +250,7 @@ export function FindingsTable({
                       onSelect?.(f);
                     }
                   }}
-                  aria-label={`${severities[f.severity].label} ${categories[f.category].finding}, record ${f.record}. Open details.`}
+                  aria-label={`${severities[f.severity].label} ${f.title}, record ${f.record}. Open details.`}
                   className={cn(
                     "group cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/45 focus-visible:bg-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
                     isReviewed && "opacity-60",
@@ -245,16 +260,18 @@ export function FindingsTable({
                     <SeverityBadge severity={f.severity} />
                   </td>
                   <td className="max-w-0 py-2.5 pr-3 align-middle">
-                    <div className="truncate text-[13px] font-medium">{categories[f.category].finding}</div>
-                    <div className="truncate text-[12px] text-muted-foreground">{f.headline}</div>
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <span className="truncate text-[13px] font-medium">{f.title}</span>
+                      <code className="hidden shrink-0 font-mono text-[11px] text-muted-foreground @5xl:inline">{f.rule}</code>
+                    </div>
+                    <div className="truncate font-mono text-[11.5px] text-muted-foreground">{f.snippet || f.message}</div>
                   </td>
                   <td className="py-2.5 pr-3 align-middle">
-                    <span className="inline-flex items-center gap-1.5 font-mono text-[12px]">
-                      {f.record}
-                      {isReviewed && <CircleCheck className="size-3 text-safe" aria-label="Reviewed" />}
+                    <span className="inline-flex max-w-[120px] items-center gap-1.5 font-mono text-[12px]">
+                      <span className="truncate">{f.record}</span>
+                      {isReviewed && <CircleCheck className="size-3 shrink-0 text-safe" aria-label="Reviewed" />}
                     </span>
                   </td>
-                  <td className="py-2.5 pr-3 align-middle font-mono text-[12px] text-muted-foreground">{f.source}</td>
                   <td className="py-2.5 pr-3 align-middle">
                     <span className="flex items-center gap-1.5 font-mono text-[12px]">
                       <span className="truncate">{detectorSummary(f)}</span>
@@ -265,12 +282,11 @@ export function FindingsTable({
                       )}
                     </span>
                   </td>
+                  <td className="py-2.5 pr-3 text-right align-middle font-mono text-[12px] tabular">{formatConfidence(f.confidence)}</td>
                   <td className="py-2.5 pr-3 align-middle">
                     <ActionBadge action={f.action} />
                   </td>
-                  <td className="py-2.5 pr-4 text-right align-middle font-mono text-[12px] text-muted-foreground">
-                    {relativeTime(f.detectedSec)}
-                  </td>
+                  <td className="py-2.5 pr-4 align-middle font-mono text-[12px] text-muted-foreground">{owaspId(f.owasp)}</td>
                 </tr>
               );
             })}
@@ -284,7 +300,7 @@ export function FindingsTable({
             </span>
             <p className="mt-4 text-sm font-medium">No findings match these filters</p>
             <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
-              Try another record ID or finding name, or clear the severity and category filters.
+              Try another record id, rule or phrase, or clear the severity and rule filters.
             </p>
             <Button variant="secondary" size="sm" className="mt-4" onClick={() => onFiltersChange(EMPTY_FILTERS)}>
               Clear filters
@@ -298,7 +314,7 @@ export function FindingsTable({
         <div className="flex flex-col gap-2 border-t px-4 py-2.5 text-xs text-muted-foreground @xl:flex-row @xl:items-center @xl:justify-between">
           <span className="tabular">
             Showing {current * pageSize + 1}–{Math.min(filtered.length, (current + 1) * pageSize)} of {filtered.length} ·
-            sorted by severity, then most recent
+            most severe first, as in the report
           </span>
           <div className="flex items-center gap-1">
             <span className="mr-2 tabular">

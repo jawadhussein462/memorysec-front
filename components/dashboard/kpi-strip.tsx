@@ -3,9 +3,9 @@ import { CircleCheck, Lock } from "lucide-react";
 import { SeverityMeter } from "@/components/security/severity";
 import { InfoTip } from "@/components/ui/tooltip";
 import { riskTone, severities } from "@/lib/catalog";
-import { riskLevel, severityCounts, topSeverity } from "@/lib/report";
+import { flaggedCount, flaggedPct, formatDuration, riskLevel, severityCounts, topSeverity } from "@/lib/report";
 import type { Scan } from "@/lib/types";
-import { cn, formatNumber, formatPercent } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
 function Kpi({ label, value, context, tip }: { label: string; value: ReactNode; context: ReactNode; tip?: string }) {
   return (
@@ -22,10 +22,12 @@ function Kpi({ label, value, context, tip }: { label: string; value: ReactNode; 
 
 export function KpiStrip({ scan }: { scan: Scan }) {
   const counts = severityCounts(scan.findings);
-  const flagged = scan.findings.length;
-  const risk = riskLevel(scan.findings, scan.records);
+  const flagged = flaggedCount(scan.findings);
+  const pct = flaggedPct(scan);
+  const risk = riskLevel(scan.findings);
   const tone = riskTone[risk];
   const top = topSeverity(scan.findings);
+  const findings = scan.findings.length;
 
   return (
     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border @lg:grid-cols-2 @4xl:grid-cols-4">
@@ -35,23 +37,29 @@ export function KpiStrip({ scan }: { scan: Scan }) {
         context={
           <span className="inline-flex items-center gap-1.5">
             <Lock className="size-3" aria-hidden="true" />
-            Read-only · {scan.duration}
+            Read-only · {formatDuration(scan.durationSeconds)}
+            {scan.sample !== null && ` · sample of ${formatNumber(scan.sample)}`}
           </span>
         }
       />
       <Kpi
         label="Records flagged"
         value={formatNumber(flagged)}
-        context={flagged ? `${counts.critical} critical · ${counts.high} high · ${counts.medium + counts.low} other` : "Nothing to review"}
+        context={
+          findings
+            ? `${formatNumber(findings)} finding${findings === 1 ? "" : "s"} · ${counts.critical} critical · ${counts.high} high`
+            : "Nothing to review"
+        }
+        tip="Distinct records with at least one finding (ScanReport.flagged). A record with two problems counts once."
       />
       <Kpi
         label="Flag rate"
-        value={formatPercent(flagged, scan.records)}
-        context={`${formatPercent(scan.records - flagged, scan.records)} of records clean`}
-        tip="Share of scanned records with at least one finding."
+        value={`${pct.toFixed(2)}%`}
+        context={`${formatNumber(Math.max(0, scan.records - flagged))} records with no finding`}
+        tip="Flagged records as a share of records read (ScanReport.flagged_pct)."
       />
       <Kpi
-        label="Overall risk"
+        label="Worst severity"
         value={
           <span className={cn("inline-flex items-center gap-2.5", tone.text)}>
             {tone.severity ? (
@@ -64,10 +72,12 @@ export function KpiStrip({ scan }: { scan: Scan }) {
         }
         context={
           top
-            ? `Driven by ${counts[top]} ${severities[top].label.toLowerCase()} finding${counts[top] === 1 ? "" : "s"}`
-            : `All ${scan.scanners.length} scanners passed`
+            ? `${counts[top]} ${severities[top].label.toLowerCase()} finding${counts[top] === 1 ? "" : "s"}`
+            : scan.errors.length
+              ? "No findings, but the scan is incomplete"
+              : `All ${Object.keys(scan.checks).length} checks passed`
         }
-        tip="The most severe finding level present, adjusted for how much of the store is affected."
+        tip="The most serious severity among the findings (ScanReport.worst_severity()). Use it with --fail-on to gate CI."
       />
     </div>
   );

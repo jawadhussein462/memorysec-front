@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { label: "Product", href: "#product" },
-  { label: "Scanners", href: "#scanners" },
+  { label: "Checks", href: "#scanners" },
   { label: "Integrations", href: "#integrations" },
   { label: "Security", href: "#security" },
   { label: "Docs", href: site.docs, external: true },
@@ -38,7 +38,7 @@ export function SiteHeader() {
       )}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-5 sm:px-8">
-        <Link href="/" aria-label="MemorySec home" className="rounded-sm">
+        <Link href="/" aria-label="Mimvo home" className="rounded-sm">
           <Logo />
         </Link>
 
@@ -69,7 +69,7 @@ export function SiteHeader() {
             <Link href="/dashboard">View demo</Link>
           </Button>
           <Button asChild size="sm">
-            <a href="#install">Install MemorySec</a>
+            <a href="#install">Install</a>
           </Button>
         </div>
 

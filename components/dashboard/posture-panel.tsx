@@ -1,11 +1,11 @@
 "use client";
 
-import { Clock, Lock, ScanSearch } from "lucide-react";
+import { CircleAlert, Clock, Lock, ScanSearch } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 import { SeverityMeter } from "@/components/security/severity";
 import { SEVERITY_ORDER, severities } from "@/lib/catalog";
 import { useMounted } from "@/lib/hooks";
-import { severityCounts } from "@/lib/report";
+import { detectorCount, isComplete, severityCounts } from "@/lib/report";
 import type { Scan, Severity } from "@/lib/types";
 import { cn, formatPercent } from "@/lib/utils";
 import { Panel } from "./panel";
@@ -29,11 +29,14 @@ export function PosturePanel({
   const counts = severityCounts(scan.findings);
   const total = scan.findings.length;
   const data = SEVERITY_ORDER.filter((s) => counts[s] > 0).map((s) => ({ name: s, value: counts[s] }));
+  // Info only appears when a scan produced it, to keep the common case to four rows.
+  const levels = SEVERITY_ORDER.filter((s) => s !== "info" || counts.info > 0);
+  const checkCount = Object.keys(scan.checks).length;
 
   return (
     <Panel
-      title="Memory security posture"
-      description="Findings by severity. Select a level to filter the table."
+      title="Findings by severity"
+      description="Severity comes from the rule, lowered one step below 0.6 confidence. Select a level to filter."
       className={cn("@container", className)}
     >
       <div className="flex flex-col items-center gap-6 @md:flex-row">
@@ -85,7 +88,7 @@ export function PosturePanel({
         </div>
 
         <ul className="w-full min-w-0 flex-1 space-y-0.5" aria-label="Findings by severity">
-          {SEVERITY_ORDER.map((s) => {
+          {levels.map((s) => {
             const active = activeSeverity === s;
             return (
               <li key={s}>
@@ -123,16 +126,25 @@ export function PosturePanel({
       <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-4 text-[12.5px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <ScanSearch className="size-3.5" aria-hidden="true" />
-          <span className="text-foreground">{scan.scanners.length} scanners</span> enabled
+          <span className="text-foreground">
+            {checkCount} {checkCount === 1 ? "check" : "checks"} · {detectorCount(scan)} detectors
+          </span>
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Clock className="size-3.5" aria-hidden="true" />
-          Last scan: {scan.completedLong}
+          Scanned {scan.completedLong}
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Lock className="size-3.5" aria-hidden="true" />
-          Read-only
-        </span>
+        {isComplete(scan) ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Lock className="size-3.5" aria-hidden="true" />
+            Read-only
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-sev-medium">
+            <CircleAlert className="size-3.5" aria-hidden="true" />
+            Incomplete
+          </span>
+        )}
       </div>
     </Panel>
   );

@@ -1,11 +1,11 @@
 import { CircleCheck } from "lucide-react";
 import { actions, riskTone, severities } from "@/lib/catalog";
-import type { RemediationAction, RiskLevel, Severity } from "@/lib/types";
+import type { Action, RiskLevel, Severity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
  * Four ascending bars: severity reads from shape as well as color,
- * so it survives color blindness and grayscale screenshots.
+ * so it survives color blindness and grayscale screenshots. Info fills none.
  */
 export function SeverityMeter({ severity, className }: { severity: Severity; className?: string }) {
   const level = severities[severity].rank;
@@ -67,7 +67,7 @@ export function RiskBadge({ risk, className }: { risk: RiskLevel; className?: st
   );
 }
 
-export function ActionBadge({ action, className }: { action: RemediationAction; className?: string }) {
+export function ActionBadge({ action, className }: { action: Action; className?: string }) {
   const Icon = actions[action].icon;
   return (
     <span
@@ -77,7 +77,7 @@ export function ActionBadge({ action, className }: { action: RemediationAction; 
       )}
     >
       <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-      {action}
+      {actions[action].label}
     </span>
   );
 }

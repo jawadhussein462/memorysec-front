@@ -29,18 +29,18 @@ export function FinalCta() {
             <Button asChild size="lg" variant="secondary">
               <a href={site.docs} target="_blank" rel="noreferrer">
                 <GitHubIcon />
-                Install MemorySec
+                Install Mimvo
               </a>
             </Button>
           </div>
         </div>
 
         <div>
-          <p className="mb-2 text-[13px] text-muted-foreground">Install the CLI and Python library</p>
+          <p className="mb-2 text-[13px] text-muted-foreground">Install the CLI and Python package (Python 3.11+)</p>
           <CommandBox command={site.install} />
           <p className="mb-2 mt-5 text-[13px] text-muted-foreground">Then scan a store, or just an export</p>
-          <CommandBox command="memorysec scan jsonl --file memory.jsonl" />
-          <p className="mt-4 font-mono text-xs text-muted-foreground">Open source · {site.license} · runs locally</p>
+          <CommandBox command="mimvo scan jsonl memory.jsonl --report report.html" />
+          <p className="mt-4 font-mono text-xs text-muted-foreground">Open source · {site.license} · runs locally · gate CI with --fail-on</p>
         </div>
       </div>
     </section>

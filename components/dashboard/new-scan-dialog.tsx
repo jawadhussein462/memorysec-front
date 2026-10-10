@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, CircleCheck, CircleDashed, LoaderCircle, Lock, Play } from "lucide-react";
+import { CopyButton, ShellCommand } from "@/components/security/code";
 import { SeverityMeter } from "@/components/security/severity";
 import { StoreGlyph } from "@/components/security/store-glyph";
 import { Button } from "@/components/ui/button";
@@ -9,16 +10,25 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { CATEGORY_ORDER, SEVERITY_ORDER, STORE_ORDER, categories, severities, stores } from "@/lib/catalog";
-import { DEMO_RECORD_COUNT, createScanFromPlan, planEndpoint, planFindingSeeds, planResource, type ScanPlan } from "@/lib/report";
-import type { CategoryId, Scan, Severity, StoreId } from "@/lib/types";
+import { CHECK_ORDER, SEVERITY_ORDER, STORE_ORDER, checks, ruleFor, severities, stores } from "@/lib/catalog";
+import { DEMO_RECORD_COUNT, PRODUCTION_CHECKS } from "@/lib/demo-data";
+import { emptySeverityCounts } from "@/lib/report";
+import {
+  createScanFromPlan,
+  planChecks,
+  planEndpoint,
+  planResource,
+  planSource,
+  type ScanPlan,
+} from "@/lib/simulate";
+import type { CheckId, Scan, Severity, StoreId } from "@/lib/types";
 import { clamp, cn, formatNumber, formatPercent } from "@/lib/utils";
 
 type Step = "source" | "configure" | "run";
 
 const STEPS: { id: Step; label: string }[] = [
   { id: "source", label: "Source" },
-  { id: "configure", label: "Scanners" },
+  { id: "configure", label: "Checks" },
   { id: "run", label: "Run" },
 ];
 
@@ -38,7 +48,7 @@ export function NewScanDialog({
   const [step, setStep] = useState<Step>("source");
   const [store, setStore] = useState<StoreId | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [enabled, setEnabled] = useState<CategoryId[]>(CATEGORY_ORDER);
+  const [enabled, setEnabled] = useState<CheckId[]>(CHECK_ORDER);
   const [plan, setPlan] = useState<ScanPlan | null>(null);
   const [runDone, setRunDone] = useState(false);
   const completedRef = useRef(false);
@@ -48,7 +58,7 @@ export function NewScanDialog({
     setStep("source");
     setStore(preset);
     setValues({});
-    setEnabled([...CATEGORY_ORDER]);
+    setEnabled([...CHECK_ORDER]);
     setPlan(null);
     setRunDone(false);
     completedRef.current = false;
@@ -57,7 +67,7 @@ export function NewScanDialog({
   const running = step === "run" && !runDone;
   const meta = store ? stores[store] : null;
   const valid = !!meta && meta.fields.every((f) => !f.required || (values[f.key] ?? "").trim() !== "");
-  const draftPlan: ScanPlan | null = store ? { store, values, scanners: enabled } : null;
+  const draftPlan: ScanPlan | null = store ? { store, values, checks: enabled } : null;
 
   const finish = () => {
     if (!plan || completedRef.current) return;
@@ -76,7 +86,7 @@ export function NewScanDialog({
 
   const startRun = () => {
     if (!draftPlan) return;
-    setPlan({ ...draftPlan, scanners: CATEGORY_ORDER.filter((c) => enabled.includes(c)) });
+    setPlan({ ...draftPlan, checks: CHECK_ORDER.filter((c) => enabled.includes(c)) });
     setRunDone(false);
     completedRef.current = false;
     setStep("run");
@@ -92,11 +102,11 @@ export function NewScanDialog({
   const titles: Record<Step, { title: string; description: string }> = {
     source: {
       title: "Choose a memory source",
-      description: "Pick the store your agent writes long-term memory to. MemorySec connects as a reader.",
+      description: "Pick the store your agent writes long-term memory to. Mimvo connects as a reader.",
     },
     configure: {
       title: "Configure scan",
-      description: "Choose which memory risk classes to scan for. All seven run by default.",
+      description: "Choose which checks run. All three run by default, as in Mimvo().",
     },
     run: {
       title: runDone ? "Scan completed" : "Scanning memory",
@@ -167,9 +177,9 @@ export function NewScanDialog({
               plan={draftPlan}
               enabled={enabled}
               onToggle={(c, on) =>
-                setEnabled((prev) => (on ? CATEGORY_ORDER.filter((x) => x === c || prev.includes(x)) : prev.filter((x) => x !== c)))
+                setEnabled((prev) => (on ? CHECK_ORDER.filter((x) => x === c || prev.includes(x)) : prev.filter((x) => x !== c)))
               }
-              onAll={() => setEnabled([...CATEGORY_ORDER])}
+              onAll={() => setEnabled([...CHECK_ORDER])}
               onBack={() => setStep("source")}
             />
           )}
@@ -204,7 +214,7 @@ export function NewScanDialog({
           {step === "run" && (
             <>
               <span className="font-mono text-xs text-muted-foreground">
-                {plan ? `${stores[plan.store].slug} / ${planResource(plan)}` : null}
+                {plan ? planSource(plan) : null}
               </span>
               {runDone ? (
                 <Button size="sm" onClick={finish}>
@@ -243,7 +253,7 @@ function SourceStep({
   const meta = store ? stores[store] : null;
   return (
     <div className="space-y-6">
-      <div role="radiogroup" aria-label="Memory source" className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div role="radiogroup" aria-label="Memory source" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {STORE_ORDER.map((id) => {
           const s = stores[id];
           const selected = store === id;
@@ -307,7 +317,7 @@ function SourceStep({
             <div>
               <p className="text-[13px] font-medium">Read-only connection</p>
               <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">
-                MemorySec reads records for analysis and does not modify your {meta.noun}. {meta.access}
+                Mimvo reads records for analysis and does not modify your {meta.noun}. {meta.access}
               </p>
             </div>
           </div>
@@ -333,19 +343,18 @@ function ConfigureStep({
   onBack,
 }: {
   plan: ScanPlan;
-  enabled: CategoryId[];
-  onToggle: (c: CategoryId, on: boolean) => void;
+  enabled: CheckId[];
+  onToggle: (c: CheckId, on: boolean) => void;
   onAll: () => void;
   onBack: () => void;
 }) {
+  const command = `${stores[plan.store].command(plan.values)} \\\n  --report report.html \\\n  --json findings.json`;
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 rounded-lg border px-3.5 py-2.5">
         <StoreGlyph store={plan.store} />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-[13px]">
-            {stores[plan.store].slug} / {planResource(plan)}
-          </div>
+          <div className="truncate font-mono text-[13px]">{planSource(plan)}</div>
           <div className="truncate font-mono text-[11px] text-muted-foreground">{planEndpoint(plan) || "default endpoint"}</div>
         </div>
         <span className="hidden items-center gap-1 rounded-[4px] border px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">
@@ -360,26 +369,36 @@ function ConfigureStep({
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-[13px] font-medium">
-            Scanners <span className="font-normal text-muted-foreground">· {enabled.length} of 7 enabled</span>
+            Checks <span className="font-normal text-muted-foreground">· {enabled.length} of {CHECK_ORDER.length} enabled</span>
           </h3>
-          {enabled.length < CATEGORY_ORDER.length && (
+          {enabled.length < CHECK_ORDER.length && (
             <button type="button" onClick={onAll} className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
               Enable all
             </button>
           )}
         </div>
         <ul className="divide-y rounded-lg border">
-          {CATEGORY_ORDER.map((c) => {
-            const meta = categories[c];
+          {CHECK_ORDER.map((c) => {
+            const meta = checks[c];
             const Icon = meta.icon;
-            const id = `scanner-${c}`;
+            const id = `check-${c}`;
             const on = enabled.includes(c);
             return (
-              <li key={c} className="flex items-center gap-3 px-3.5 py-2.5">
-                <Icon className={cn("size-4 shrink-0", on ? "text-foreground" : "text-muted-foreground")} aria-hidden="true" />
+              <li key={c} className="flex items-start gap-3 px-3.5 py-3">
+                <Icon className={cn("mt-0.5 size-4 shrink-0", on ? "text-foreground" : "text-muted-foreground")} aria-hidden="true" />
                 <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
-                  <span className="block text-[13px] font-medium">{meta.scanner}</span>
-                  <span className="block truncate text-[12px] text-muted-foreground">{meta.description}</span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-[13px] font-medium">{meta.label}</span>
+                    <code className="font-mono text-[11px] text-muted-foreground">{meta.className}</code>
+                  </span>
+                  <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">{meta.description}</span>
+                  <span className="mt-1.5 flex flex-wrap gap-1">
+                    {PRODUCTION_CHECKS[c].map((d) => (
+                      <span key={d} className="rounded-[3px] border bg-muted/50 px-1 font-mono text-[10.5px] text-muted-foreground">
+                        {d}
+                      </span>
+                    ))}
+                  </span>
                 </label>
                 <Switch id={id} checked={on} onCheckedChange={(v) => onToggle(c, v)} />
               </li>
@@ -388,15 +407,29 @@ function ConfigureStep({
           <li className="flex items-center gap-3 bg-muted/30 px-3.5 py-2.5">
             <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium">Mask secrets in report</span>
+              <span className="block text-[13px] font-medium">Mask secrets in reports</span>
               <span className="block truncate text-[12px] text-muted-foreground">
-                Keys, tokens, and personal data are masked before anything is written.
+                Secret values are masked in snippets and never written to findings, JSON, logs, or traces.
               </span>
             </div>
             <span className="text-[11.5px] text-muted-foreground">Always on</span>
           </li>
         </ul>
-        {enabled.length === 0 && <p className="mt-2 text-[12.5px] text-sev-medium">Enable at least one scanner to run a scan.</p>}
+        {enabled.length === 0 && <p className="mt-2 text-[12.5px] text-sev-medium">Enable at least one check to run a scan.</p>}
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-[13px] font-medium">Same scan from your terminal</h3>
+          <CopyButton value={command} label="Copy command" />
+        </div>
+        <div className="theme-dark scrollbar-thin overflow-x-auto rounded-lg border bg-terminal px-3.5 py-2.5 font-mono text-[12px] leading-[1.7] text-terminal-foreground">
+          <ShellCommand command={command} />
+        </div>
+        <p className="mt-1.5 text-[11.5px] text-muted-foreground">
+          The demo runs every enabled check with the detectors listed above. The CLI runs the offline defaults; add model
+          detectors from Python.
+        </p>
       </div>
     </div>
   );
@@ -410,11 +443,10 @@ const STAGES = [
   { label: "Connecting to source", start: 0, end: 900 },
   { label: "Reading records", start: 900, end: 4300 },
   { label: "Running detectors", start: 1400, end: 5300 },
-  { label: "Grouping findings", start: 5300, end: 6200 },
+  { label: "Merging findings", start: 5300, end: 6200 },
   { label: "Generating report", start: 6200, end: 7000 },
 ];
 const RUN_TOTAL = 7000;
-const SEV_RANK: Record<Severity, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
 function ScanRun({ plan, onFinished }: { plan: ScanPlan; onFinished: () => void }) {
   const [elapsed, setElapsed] = useState(0);
@@ -438,43 +470,45 @@ function ScanRun({ plan, onFinished }: { plan: ScanPlan; onFinished: () => void 
   }, []);
 
   const stats = useMemo(() => {
-    const seeds = planFindingSeeds(plan);
-    const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    const findings = createScanFromPlan(plan).findings;
+    const counts: Record<Severity, number> = emptySeverityCounts();
     let hits = 0;
-    const detectors = new Set<string>();
-    for (const s of seeds) {
-      counts[s.severity]++;
-      hits += s.detectors.length;
-      s.detectors.forEach((d) => detectors.add(d.name));
+    for (const f of findings) {
+      counts[f.severity]++;
+      hits += f.detectors.length;
     }
-    const pii = seeds.filter((s) => s.category === "pii").length;
-    const top = [...seeds].sort((a, b) => SEV_RANK[b.severity] - SEV_RANK[a.severity] || a.detectedSec - b.detectedSec).slice(0, 3);
-    return { total: seeds.length, counts, hits, detectors: detectors.size, pii, top };
+    const detectors = Object.values(planChecks(plan)).reduce((n, d) => n + d.length, 0);
+    const masked = findings.filter((f) => f.snippet.includes("••")).length;
+    const top = findings.slice(0, 3);
+    return { total: findings.length, counts, hits, detectors, masked, top };
   }, [plan]);
 
   const total = DEMO_RECORD_COUNT;
-  const slug = stores[plan.store].slug;
   const resource = planResource(plan);
   const endpoint = planEndpoint(plan);
 
   const readP = clamp((elapsed - 900) / 3400);
   const read = Math.round(total * (1 - Math.pow(1 - readP, 1.6)));
   const detP = clamp((elapsed - 1400) / 3900);
-  const tallies = SEVERITY_ORDER.map((s) => Math.round(stats.counts[s] * detP));
+  const levels = SEVERITY_ORDER.filter((s) => s !== "info");
+  const tallies = levels.map((s) => Math.round(stats.counts[s] * detP));
+  const batch = plan.store === "qdrant" ? 256 : plan.store === "pinecone" ? 100 : 500;
+  const batches = Math.ceil(total / batch);
   const done = elapsed >= RUN_TOTAL;
   const currentStage = [...STAGES].reverse().find((s) => elapsed >= s.start && elapsed < s.end) ?? STAGES[STAGES.length - 1];
 
   const logs = [
-    { at: 120, text: `connecting to ${slug} ${endpoint}`.trim() },
+    { at: 120, text: `connecting to ${stores[plan.store].slug} ${endpoint}`.trim() },
     { at: 700, text: `connected · ${stores[plan.store].noun} ${resource} · read-only`, tone: "text-safe" },
-    { at: 950, text: `${formatNumber(total)} records · streaming in batches of 512` },
-    { at: 1500, text: `loaded ${plan.scanners.length} scanners · ${stats.detectors} detectors` },
-    { at: 2400, text: "batch 24/95 · 12,288 records" },
-    { at: 3300, text: "batch 59/95 · 30,208 records" },
-    { at: 4300, text: `batch 95/95 · ${formatNumber(total)} records` },
-    { at: 5400, text: `grouping ${stats.hits} detector hits into ${stats.total} findings` },
-    { at: 5900, text: `masking ${stats.pii} snippets containing secrets or personal data` },
-    { at: 6300, text: "writing report" },
+    { at: 950, text: `streaming records in batches of ${batch}` },
+    { at: 1500, text: `${plan.checks.length} checks · ${stats.detectors} detectors · ${plan.checks.join(", ")}` },
+    { at: 2400, text: `batch ${Math.round(batches * 0.25)}/${batches} · ${formatNumber(Math.round(batches * 0.25) * batch)} records` },
+    { at: 3300, text: `batch ${Math.round(batches * 0.62)}/${batches} · ${formatNumber(Math.round(batches * 0.62) * batch)} records` },
+    { at: 4300, text: `batch ${batches}/${batches} · ${formatNumber(total)} records` },
+    { at: 4900, text: "vector detectors · one nearest-neighbour table for trustrag and hubness" },
+    { at: 5400, text: `merging ${stats.hits} detector hits into ${stats.total} findings` },
+    { at: 5900, text: `masking secret values in ${stats.masked} snippets` },
+    { at: 6300, text: "writing report.html and findings.json" },
     {
       at: 6990,
       text: `done · ${stats.total} records flagged (${formatPercent(stats.total, total)})`,
@@ -537,7 +571,7 @@ function ScanRun({ plan, onFinished }: { plan: ScanPlan; onFinished: () => void 
         </ol>
 
         <div className="grid grid-cols-2 gap-2 self-start">
-          {SEVERITY_ORDER.map((s, i) => (
+          {levels.map((s, i) => (
             <div key={s} className="rounded-md border px-3 py-2">
               <div className={cn("flex items-center gap-1.5 text-[11.5px]", severities[s].text)}>
                 <SeverityMeter severity={s} />
@@ -569,7 +603,7 @@ function ScanRun({ plan, onFinished }: { plan: ScanPlan; onFinished: () => void 
                 {visible ? (
                   <>
                     <SeverityMeter severity={f.severity} />
-                    <span className="min-w-0 flex-1 truncate text-[13px]">{categories[f.category].finding}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px]">{ruleFor(f.rule).title}</span>
                     <span className="font-mono text-[12px] text-muted-foreground">{f.record}</span>
                   </>
                 ) : (

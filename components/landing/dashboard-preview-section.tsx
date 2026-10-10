@@ -16,8 +16,8 @@ export function DashboardPreviewSection() {
     <section id="dashboard" aria-labelledby="dashboard-title" className="scroll-mt-16 border-b">
       <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
         <SectionHeading id="dashboard-title" title="Every finding, one click from its evidence.">
-          The same report the CLI writes, as an interactive dashboard. Filter by severity or memory risk class, then open
-          a finding to see which detectors agreed and what to do about it.
+          The same report the CLI writes, as an interactive dashboard. Filter by severity or rule, open a finding to see
+          which detectors agreed and how to fix it, or drop in the JSON from your own scan.
         </SectionHeading>
 
         <figure className="mt-14">
@@ -25,7 +25,7 @@ export function DashboardPreviewSection() {
             <div className="flex h-10 items-center gap-3 border-b bg-muted/60 px-4">
               <LogoMark className="size-4 text-muted-foreground" />
               <div className="mx-auto flex h-6 min-w-0 max-w-xs flex-1 items-center justify-center rounded-md border bg-card px-3 font-mono text-[11.5px] text-muted-foreground">
-                <span className="truncate">localhost:7411/dashboard</span>
+                <span className="truncate">mimvo.dev/dashboard</span>
               </div>
               <span className="hidden font-mono text-[11px] text-muted-foreground sm:block">demo data</span>
             </div>
@@ -40,8 +40,8 @@ export function DashboardPreviewSection() {
             </div>
           </div>
           <figcaption className="sr-only">
-            Preview of the MemorySec dashboard: 48,291 records scanned, 137 flagged, overall risk high, findings by severity
-            and category, and the most recent findings.
+            Preview of the Mimvo dashboard: 48,291 records scanned, 137 flagged, worst severity critical, findings by
+            severity and by rule, and the findings table.
           </figcaption>
         </figure>
 
@@ -49,7 +49,10 @@ export function DashboardPreviewSection() {
           <Button asChild size="lg">
             <Link href="/dashboard">Open interactive dashboard</Link>
           </Button>
-          <span className="text-[13.5px] text-muted-foreground">No signup. Runs in your browser on sample data.</span>
+          <span className="text-[13.5px] text-muted-foreground">
+            No signup. Sample data, or open the file from <code className="font-mono text-[12.5px]">mimvo scan --json</code>;
+            it never leaves your browser.
+          </span>
         </div>
       </div>
     </section>

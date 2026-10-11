@@ -10,7 +10,7 @@
 
 <h3>Website and dashboard for <a href="https://github.com/jawadhussein462/mimvo">mimvo</a>, the security scanner for AI agent memory.</h3>
 
-**[mimvo.dev](https://mimvo.dev)** · **[Docs](https://mimvo.dev/docs)** · [Live dashboard](https://mimvo.dev/dashboard) · [Python package](https://github.com/jawadhussein462/mimvo)
+**[mimvo.dev](https://mimvo.dev)** · **[Docs](https://mimvo.dev/docs)** · [Live dashboard](https://mimvo.dev/dashboard) · [PyPI](https://pypi.org/project/mimvo/) · [Python package](https://github.com/jawadhussein462/mimvo)
 
 </div>
 
@@ -18,7 +18,7 @@
 
 - `/`: landing page. Two calls to action, as on most open-source startups' sites: **Book a demo** (`/demo`) and
   **Try open source** (`/docs`), and the docs lead on to GitHub.
-- `/docs`: documentation, ported from the package README. Mimvo is not on PyPI, so every install step uses git and uv.
+- `/docs`: documentation, ported from the package README. Install steps use PyPI (`pip install mimvo`).
 - `/demo`: demo request form. Submitting it emails `site.contactEmail` (`/api/demo`).
 - `/dashboard`: interactive dashboard. It opens on a sample scan, and it opens **your own report**: run
   `mimvo scan ... --json findings.json`, then use **Open report** (or drop the file on the page). The file is parsed in

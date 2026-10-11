@@ -16,13 +16,9 @@ export const site = {
    */
   contactEmail: "jawadhussein462@gmail.com",
   demoBookingUrl: "" as string,
-  /**
-   * Mimvo is not published on PyPI: it installs from the GitHub repository with uv.
-   * The same lines appear in the hero, the open-source section and the docs.
-   */
-  cloneCommand: `git clone ${repo}`,
-  quickstart: [`git clone ${repo}`, "cd mimvo", "uv sync", "source .venv/bin/activate"],
-  gitSpec: `git+${repo}`,
+  /** Published package. Install lines across the site use this. */
+  pypi: "https://pypi.org/project/mimvo/",
+  install: "pip install mimvo",
   license: "Apache-2.0",
 };
 

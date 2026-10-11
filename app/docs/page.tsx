@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/landing/site-header";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Install Mimvo from GitHub, scan Chroma, Qdrant, pgvector, Pinecone, LangChain, mem0 or JSONL memory, and read the findings. Open source, read-only, offline by default.",
+    "Install Mimvo from PyPI, scan Chroma, Qdrant, pgvector, Pinecone, LangChain, mem0 or JSONL memory, and read the findings. Open source, read-only, offline by default.",
   alternates: { canonical: "/docs" },
 };
 

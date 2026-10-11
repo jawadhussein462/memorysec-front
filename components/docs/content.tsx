@@ -7,14 +7,13 @@ import { A, C, Callout, Code, DocSection, H3, H4, P, Step, Steps, Table, UL } fr
 
 /*
  * The documentation, ported from the package README (github.com/jawadhussein462/mimvo).
- * Mimvo is not on PyPI, so every install step uses git and uv.
+ * Install steps use PyPI (`pip install mimvo`).
  */
 
 const REPO = site.github;
-const GIT = site.gitSpec;
 
 const START_CARDS = [
-  { href: "#installation", icon: Download, title: "Install", body: "Clone the repository and set it up with uv." },
+  { href: "#installation", icon: Download, title: "Install", body: "Install from PyPI with pip." },
   { href: "#quickstart", icon: BookOpenCheck, title: "Run your first scan", body: "Point Mimvo at a store or a JSONL export." },
   { href: "#what-it-finds", icon: ShieldAlert, title: "What it finds", body: "Thirteen finding codes across three checks." },
   { href: "#use-in-ci", icon: GitBranch, title: "Gate CI", body: "Fail a pipeline on findings and upload SARIF." },
@@ -161,50 +160,31 @@ const EXTRAS: [string, string, string][] = [
 
 function Installation() {
   return (
-    <DocSection id="installation" title="Installation" lead="Mimvo installs from its GitHub repository. You need Python 3.11+ and uv.">
-      <Callout title="Mimvo is not on PyPI">
-        Install it from source as shown below. If you don&apos;t have uv yet, follow the{" "}
-        <A href="https://docs.astral.sh/uv/getting-started/installation/">uv installation guide</A>; uv also installs a
-        matching Python for you.
-      </Callout>
-
-      <H3 id="install-from-github">From GitHub</H3>
+    <DocSection id="installation" title="Installation" lead="Mimvo is on PyPI. You need Python 3.11+.">
+      <H3 id="install-with-pip">With pip</H3>
       <Steps>
-        <Step title="Clone the repository">
-          <Code code={`git clone ${REPO}\ncd mimvo`} />
-        </Step>
-        <Step title="Install with the extras you need">
+        <Step title="Install the package">
           <Code
-            code={`uv sync                                 # core + JSONL scanning
-uv sync --extra qdrant                  # plus the store you use
-uv sync --extra qdrant --extra fast     # several extras in one command`}
+            code={`pip install mimvo                       # core + JSONL scanning
+pip install "mimvo[qdrant]"             # plus the store you use
+pip install "mimvo[qdrant,fast]"        # several extras in one command`}
           />
           <P className="text-[14.5px]">
-            <C>uv sync</C> installs exactly what you ask for, so pass every extra you need in the same command. A later run
-            without an extra removes it.
+            Extras are optional. The core package scans JSONL with no store client. See{" "}
+            <A href="#extras">Optional extras</A>, or the <A href={site.pypi}>package on PyPI</A>.
           </P>
         </Step>
-        <Step title="Activate the environment">
-          <Code
-            code={`source .venv/bin/activate
-mimvo --version`}
-          />
-          <P className="text-[14.5px]">
-            Or skip activation and prefix commands with <C>uv run</C>, for example{" "}
-            <C>uv run mimvo scan jsonl export.jsonl</C>.
-          </P>
+        <Step title="Check the install">
+          <Code code="mimvo --version" />
         </Step>
       </Steps>
 
       <H3 id="install-in-your-project">In your own project</H3>
-      <P>Add Mimvo to a uv project straight from GitHub, or install only the command-line tool:</P>
+      <P>Add Mimvo as a dependency, or install only the command-line tool. Both resolve from PyPI:</P>
       <Code
-        code={`uv add "mimvo[qdrant] @ ${GIT}"            # as a dependency of your project
-uv tool install "mimvo[qdrant] @ ${GIT}"   # just the mimvo command, in its own environment`}
+        code={`uv add "mimvo[qdrant]"            # as a dependency of your project
+uv tool install "mimvo[qdrant]"   # just the mimvo command, in its own environment`}
       />
-      <P>
-        To pin a version, append a commit or tag to the URL: <C>{`mimvo @ ${GIT}@<commit>`}</C>.
-      </P>
 
       <H3 id="extras">Optional extras</H3>
       <Table
@@ -417,8 +397,10 @@ function UseInCi() {
       security-events: write   # for the SARIF upload
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv tool install "mimvo @ ${GIT}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mimvo
       - name: Scan agent memory
         run: |
           mimvo scan jsonl memory-export.jsonl \\
@@ -818,7 +800,7 @@ function Observability() {
     <DocSection id="observability" title="Observability">
       <P>
         Mimvo logs through <A href="https://github.com/Delgan/loguru">loguru</A> and never adds or removes sinks; your
-        application decides where logs go. OpenTelemetry tracing is opt-in: install with <C>--extra otel</C>.
+        application decides where logs go. OpenTelemetry tracing is opt-in: <C>pip install &quot;mimvo[otel]&quot;</C>.
       </P>
       <Code
         lang="python"

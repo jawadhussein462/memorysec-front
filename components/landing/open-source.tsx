@@ -13,7 +13,7 @@ const POINTS = [
   { icon: Blocks, title: "Extensible", body: "Stack Hugging Face classifiers, hosted guardrails, or your own detector per check." },
 ];
 
-const INSTALL = [`git clone ${site.github}`, "cd mimvo && uv sync --extra pgvector", "source .venv/bin/activate"];
+const INSTALL = [`pip install "mimvo[pgvector]"`];
 
 const SCAN = `mimvo scan pgvector \\
   --dsn postgresql://localhost/app \\
@@ -124,7 +124,7 @@ export function OpenSource() {
             </div>
           </TerminalFrame>
           <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
-            Installs from GitHub with uv; Python 3.11+.{" "}
+            Installs from PyPI. Python 3.11+.{" "}
             <Link href="/docs#installation" className="font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground">
               Installation guide
             </Link>

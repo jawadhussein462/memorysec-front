@@ -74,7 +74,7 @@ export default function DemoPage() {
             <div style={delay(320)} className="intro mt-12 max-w-lg rounded-xl border border-dashed bg-card/60 p-5">
               <p className="text-[15px] font-semibold">Prefer to start on your own?</p>
               <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
-                Mimvo is open source under {site.license}. Install it from GitHub and run your first scan in a few minutes.
+                Mimvo is open source under {site.license}. Install it from PyPI and run your first scan in a few minutes.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="sm">

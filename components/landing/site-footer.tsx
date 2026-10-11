@@ -32,6 +32,7 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
     title: "Open source",
     links: [
       { label: "GitHub", href: site.github },
+      { label: "PyPI", href: site.pypi },
       { label: "Issues", href: `${site.github}/issues` },
       { label: "Changelog", href: repoFile("CHANGELOG.md") },
       { label: "Contributing", href: repoFile("CONTRIBUTING.md") },

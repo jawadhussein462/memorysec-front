@@ -268,7 +268,7 @@ export interface StoreMeta {
   noun: string;
   description: string;
   access: string;
-  /** Optional extra that installs the client, if any (`uv sync --extra <extra>`). */
+  /** pip extra that installs the client, if any. */
   extra?: string;
   fields: StoreField[];
   demo: Record<string, string>;
@@ -543,13 +543,10 @@ ${pyReport("source", "jsonl:./exports/agent_memory.jsonl")}`,
   },
 };
 
-/**
- * Install line for a store, run inside a clone of the mimvo repository.
- * Mimvo is not on PyPI; it installs from source with uv.
- */
+/** `pip install` line for a store, with its extra. */
 export function installCommand(store: StoreId) {
   const extra = stores[store].extra;
-  return extra ? `uv sync --extra ${extra}` : "uv sync";
+  return extra ? `pip install "mimvo[${extra}]"` : "pip install mimvo";
 }
 
 /** Map a `ScanReport.source` label (`qdrant:agent_memory`) to a store. */

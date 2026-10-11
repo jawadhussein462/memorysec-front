@@ -21,7 +21,7 @@ export const DOC_GROUPS: DocGroup[] = [
         id: "installation",
         label: "Installation",
         sub: [
-          { id: "install-from-github", label: "From GitHub" },
+          { id: "install-with-pip", label: "With pip" },
           { id: "install-in-your-project", label: "In your own project" },
           { id: "extras", label: "Optional extras" },
         ],

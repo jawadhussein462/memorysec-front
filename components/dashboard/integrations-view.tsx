@@ -7,7 +7,6 @@ import { StoreGlyph } from "@/components/security/store-glyph";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { STORE_ORDER, installCommand, stores } from "@/lib/catalog";
-import { site } from "@/lib/site";
 import type { StoreId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "./panel";
@@ -124,11 +123,10 @@ function IntegrationDetail({ store, onScan }: { store: StoreId; onScan: () => vo
         </div>
 
         <section>
-          <h3 className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">Install from source</h3>
-          <CommandBox command={site.cloneCommand} />
-          <CommandBox command={installCommand(store)} className="mt-2" />
+          <h3 className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">Install</h3>
+          <CommandBox command={installCommand(store)} />
           <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
-            Run the second line inside the cloned <code className="font-mono">mimvo</code> folder.{" "}
+            Python 3.11+, from PyPI.{" "}
             <a href="/docs#installation" className="underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground">
               Installation guide
             </a>

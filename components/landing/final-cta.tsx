@@ -11,7 +11,7 @@ const PATHS = [
     id: "oss",
     label: "Open source",
     title: "Start on your own",
-    body: `Free under ${site.license}. Install from GitHub and scan your first store in minutes.`,
+    body: `Free under ${site.license}. Install from PyPI and scan your first store in minutes.`,
     points: [
       "CLI and Python package",
       "Secrets, injection and poisoning checks",
